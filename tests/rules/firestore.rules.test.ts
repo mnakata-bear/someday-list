@@ -16,8 +16,10 @@ beforeAll(async () => {
 afterAll(async () => { await env?.cleanup(); });
 beforeEach(async () => { await env.clearFirestore(); });
 
-const alice = () => env.authenticatedContext("alice").firestore();
-const bob = () => env.authenticatedContext("bob").firestore();
+// 許可されたメール(alice / bob とも同じメールで uid だけ違う)
+const ALLOWED = { email: "bears.sys.apps@gmail.com", email_verified: true };
+const alice = () => env.authenticatedContext("alice", ALLOWED).firestore();
+const bob = () => env.authenticatedContext("bob", ALLOWED).firestore();
 const anon = () => env.unauthenticatedContext().firestore();
 
 describe("本人だけが読み書きできる", () => {
@@ -49,6 +51,33 @@ describe("本人だけが読み書きできる", () => {
   it("users/{uid} の外は拒否", async () => {
     await assertFails(setDoc(doc(alice(), "other/x"), { a: 1 }));
     await assertFails(getDoc(doc(alice(), "users/alice")));
+  });
+});
+
+describe("許可されたメールだけが使える", () => {
+  it("許可されていないメールは、自分の uid でも読み書きできない", async () => {
+    await env.withSecurityRulesDisabled(async (c) => { await setDoc(doc(c.firestore(), "users/carol/tasks/t1"), task()); });
+    const db = env.authenticatedContext("carol", { email: "other@example.com", email_verified: true }).firestore();
+    await assertFails(getDoc(doc(db, "users/carol/tasks/t1")));
+    await assertFails(getDocs(collection(db, "users/carol/tasks")));
+    await assertFails(setDoc(doc(db, "users/carol/tasks/t2"), task()));
+    await assertFails(updateDoc(doc(db, "users/carol/tasks/t1"), { title: "x" }));
+    await assertFails(deleteDoc(doc(db, "users/carol/tasks/t1")));
+    await assertFails(getDoc(doc(db, "users/carol/meta/settings")));
+    await assertFails(setDoc(doc(db, "users/carol/meta/settings"), { layout: "a", theme: "penguin", wp: "none", stamp: "sumi" }));
+    await assertFails(setDoc(doc(db, "users/carol/meta/stats"), { stampTotal: 1 }));
+  });
+  it("email_verified が false なら、許可メールでも読み書きできない", async () => {
+    await env.withSecurityRulesDisabled(async (c) => { await setDoc(doc(c.firestore(), "users/alice/tasks/t1"), task()); });
+    const db = env.authenticatedContext("alice", { email: "bears.sys.apps@gmail.com", email_verified: false }).firestore();
+    await assertFails(getDoc(doc(db, "users/alice/tasks/t1")));
+    await assertFails(setDoc(doc(db, "users/alice/tasks/t2"), task()));
+    await assertFails(deleteDoc(doc(db, "users/alice/tasks/t1")));
+  });
+  it("メールの無いトークンも読み書きできない", async () => {
+    const db = env.authenticatedContext("alice").firestore();
+    await assertFails(getDoc(doc(db, "users/alice/tasks/t1")));
+    await assertFails(setDoc(doc(db, "users/alice/tasks/t1"), task()));
   });
 });
 

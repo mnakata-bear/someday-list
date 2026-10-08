@@ -291,3 +291,52 @@ dialog.ask { max-width: 420px }
 dialog.ask .sheet-body p { margin: 0; font-size: 14px }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important } }
+
+/* ===== ログイン画面(ログインの壁)— ペンギンの色で固定 ===== */
+.gate { position: relative; min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; overflow: hidden;
+  padding: calc(env(safe-area-inset-top) + 24px) calc(env(safe-area-inset-right) + 16px) calc(env(safe-area-inset-bottom) + 24px) calc(env(safe-area-inset-left) + 16px);
+  background:
+    radial-gradient(color-mix(in srgb, var(--a1) 16%, transparent) 1.2px, transparent 1.6px) 0 0/22px 22px,
+    var(--bg) }
+.gate::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse 60% 55% at 50% 50%, var(--bg) 35%, transparent 100%) }
+.gate-aura { position: absolute; inset: 0; pointer-events: none; filter: blur(48px); opacity: .75 }
+.gate-aura i { position: absolute; border-radius: 50%; display: block }
+.gate-aura i:nth-child(1) { width: 46vmax; height: 46vmax; left: -14vmax; top: -16vmax; background: color-mix(in srgb, var(--a2) 55%, transparent); animation: drift 18s var(--ease) infinite alternate }
+.gate-aura i:nth-child(2) { width: 40vmax; height: 40vmax; right: -12vmax; bottom: -14vmax; background: color-mix(in srgb, var(--a1) 45%, transparent); animation: drift 22s var(--ease) infinite alternate-reverse }
+.gate-aura i:nth-child(3) { width: 18vmax; height: 18vmax; right: 12vmax; top: 8vmax; background: color-mix(in srgb, var(--stamp) 22%, transparent); animation: drift 26s var(--ease) infinite alternate }
+@keyframes drift { to { transform: translate(4vmax, 3vmax) scale(1.08) } }
+
+.gate-card { position: relative; z-index: 1; width: min(400px, 100%); display: grid; justify-items: center; text-align: center; gap: 0;
+  padding: 48px 32px 36px; border-radius: 32px; border: 1px solid color-mix(in srgb, var(--border) 80%, #fff);
+  background: color-mix(in srgb, var(--surface) 72%, transparent); backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  box-shadow: 0 1px 0 rgb(255 255 255/.8) inset, 0 2px 4px rgb(30 50 90/.04), 0 24px 60px -18px rgb(40 80 140/.28);
+  animation: gatein .7s var(--ease) both }
+@keyframes gatein { from { opacity: 0; transform: translateY(14px) scale(.985) } }
+
+.gate-icon { position: relative; width: 104px; height: 104px; display: grid; place-items: center; margin-bottom: 22px }
+.gate-icon::before { content: ""; position: absolute; inset: -10px; border-radius: 36px; background: conic-gradient(from 200deg, var(--a1), var(--a2), color-mix(in srgb, var(--a2) 20%, transparent), var(--a1)); opacity: .28; filter: blur(10px) }
+.gate-icon img { position: relative; width: 96px; height: 96px; border-radius: 26px; display: block; box-shadow: 0 0 0 1px rgb(255 255 255/.9), 0 14px 30px -10px rgb(40 80 140/.45); animation: bob 5s ease-in-out infinite }
+@keyframes bob { 50% { transform: translateY(-5px) } }
+
+.gate-title { font-family: "M PLUS 1p", "Manrope", sans-serif; font-size: 28px; font-weight: 700; letter-spacing: .1em; color: var(--text); margin: 0 }
+.gate-title::after { content: ""; display: block; width: 36px; height: 3px; border-radius: 99px; margin: 14px auto 0; background: var(--grad) }
+
+.gate-act { margin-top: 30px; width: 100%; display: grid; justify-items: center; min-height: 52px }
+.gate-btn { height: 52px; min-width: 248px; padding: 0 26px 0 8px; display: inline-flex; align-items: center; justify-content: center; gap: 14px;
+  border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-weight: 700; font-size: 15px; letter-spacing: .06em; cursor: pointer;
+  box-shadow: 0 1px 2px rgb(30 50 90/.06), 0 10px 24px -12px rgb(40 80 140/.35); transition: transform .18s var(--ease), box-shadow .18s var(--ease), border-color .18s var(--ease) }
+.gate-btn[data-act="reload"] { padding: 0 26px }
+.gate-btn:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--a1) 45%, var(--border)); box-shadow: 0 1px 2px rgb(30 50 90/.06), 0 16px 30px -12px rgb(40 80 140/.45) }
+.gate-btn:active { transform: none }
+.gate-btn:focus-visible { outline: 3px solid var(--a1); outline-offset: 3px }
+.gate-btn:disabled { opacity: .6; cursor: progress; transform: none }
+.gchip { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: #fff; box-shadow: 0 0 0 1px var(--border) }
+.gate-wait { height: 52px; display: inline-flex; align-items: center; gap: 12px; padding: 0 22px; border-radius: 999px; background: var(--soft); color: var(--a1); font-size: 14px; font-weight: 700; letter-spacing: .06em }
+.gate-msg { margin: 18px 0 0; padding: 8px 16px; border-radius: 12px; font-size: 13px; font-weight: 700; line-height: 1.6;
+  color: var(--danger); background: color-mix(in srgb, var(--danger) 9%, transparent); border: 1px solid color-mix(in srgb, var(--danger) 18%, transparent) }
+@media (max-width: 480px) {
+  .gate-card { padding: 40px 22px 30px; border-radius: 28px }
+  .gate-title { font-size: 24px }
+  .gate-btn { min-width: 0; width: 100% }
+}

@@ -8,7 +8,8 @@ import {
 import { parseSpoken } from "./core/spoken";
 import { LocalStore } from "./store/local";
 import type { Store, StoreState } from "./store/types";
-import type { Cloud } from "./store/cloud";
+import type { Cloud, CloudUser } from "./store/cloud";
+import { isAllowedAccount } from "./core/access";
 import type { FirestoreStore } from "./store/firestore";
 import { firebaseConfig, useEmulator } from "./firebase-config";
 import { clearPhoto, loadPhoto, savePhoto } from "./ui/photo";
@@ -39,12 +40,22 @@ let settings: Settings = normalizeSettings(null);
   if (first) settings = first;
 }
 let cloud: Cloud | null = null;
-let user: { uid: string; name: string; email: string } | null = null;
+let user: CloudUser | null = null;
 let authResolved = !firebaseConfig;
 let photoURL = "";
 let online = navigator.onLine;
 let remoteBusyUntil = 0;
 let editingId: string | null = null;
+
+/**
+ * ログインの壁(Firebase 設定ありのビルドだけ)。null のときだけアプリ画面を描画する。
+ *   checking: ログイン状態の確認中 / login: 未ログイン / error: クラウドに接続できない
+ */
+type Gate = "checking" | "login" | "error" | null;
+let gate: Gate = firebaseConfig ? "checking" : null;
+let gateMsg = "";
+let gateBusy = false;
+const EMPTY_STATE: StoreState = { tasks: [], stampTotal: 0, ready: false, pending: false, remote: null };
 
 /** チェック時のスタンプ押下・他端末からの変更のハイライト(期限つき) */
 const fx = new Map<string, { kind: "pop" | "flash"; until: number }>();
@@ -52,7 +63,7 @@ let cardPop: { from: number; until: number } | null = null;
 
 /* ================= テーマ ================= */
 function applyTheme() {
-  const th = THEMES[settings.theme] ?? THEMES.penguin;
+  const th = gate ? THEMES.penguin : (THEMES[settings.theme] ?? THEMES.penguin); // ログイン画面はペンギンの色で固定
   const st = app.style;
   const set = (k: string, v: string) => st.setProperty(k, v);
   set("--bg", th.bg); set("--surface", th.s); set("--surface2", th.s2); set("--border", th.b);
@@ -61,8 +72,8 @@ function applyTheme() {
   set("--warn", th.dk ? "#f5b041" : "#c26a12");
   set("--ckr", settings.layout === "c" ? "50%" : "9px"); set("--blend", th.dk ? "normal" : "multiply"); set("--scheme", th.dk ? "dark" : "light");
   if (photoURL) set("--photo", `url("${photoURL}")`);
-  const wp = settings.wp === "photo" && !photoURL ? "mesh" : settings.wp;
-  app.className = `t l${settings.layout} st-${settings.stamp}${th.dk ? " dk" : ""}${wp !== "none" ? " wpon" : ""}`;
+  const wp = gate ? "none" : settings.wp === "photo" && !photoURL ? "mesh" : settings.wp;
+  app.className = gate ? "t la gated" : `t l${settings.layout} st-${settings.stamp}${th.dk ? " dk" : ""}${wp !== "none" ? " wpon" : ""}`;
   bgwall.className = `bgwall wp-${wp}`;
   document.documentElement.style.setProperty("--page-bg", th.bg);
   document.documentElement.style.colorScheme = th.dk ? "dark" : "light";
@@ -105,11 +116,40 @@ function phone() {
   </div><footer class="ph-foot gl">${formHTML()}</footer></div>`;
 }
 
+const googleG = `<svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>`;
+
+/** ログイン画面(確認中も同じ見た目)。アプリの中身は一切含めない */
+function gateHTML() {
+  const action = gate === "checking"
+    ? `<div class="gate-wait" role="status" data-testid="gate-checking"><span class="spin"></span>確認しています…</div>`
+    : gate === "error"
+      ? `<button type="button" class="gate-btn" data-act="reload">再読み込み</button>`
+      : `<button type="button" class="gate-btn" data-act="login"${gateBusy ? " disabled" : ""}><span class="gchip">${googleG}</span><span>Googleでログイン</span></button>`;
+  return `<main class="gate" data-testid="gate" data-gate="${gate}">
+    <div class="gate-aura" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="gate-card">
+      <div class="gate-icon"><img src="${ICON}" alt="" width="96" height="96"></div>
+      <h1 class="gate-title">いつかやること</h1>
+      <div class="gate-act">${action}</div>
+      <p class="gate-msg" role="alert" data-testid="gate-msg"${gateMsg ? "" : " hidden"}>${esc(gateMsg)}</p>
+    </div></main>`;
+}
+
+function setGate(g: Gate) {
+  if (g && !gate) {
+    // アプリ画面からログイン画面へ: 開いているシートや音声入力を閉じる
+    voiceAdd.abort(); voiceNote.abort();
+    [settingsDlg, editorDlg, askDlg].forEach((d) => { if (d.open) d.close(); });
+  }
+  gate = g;
+  applyTheme();
+  renderShell();
+}
+
 function syncHTML() {
   const pill = (cls: string, txt: string) => `<span class="sync${cls ? " " + cls : ""}" data-testid="sync">${txt}</span>`;
   if (!authResolved || !state.ready) return pill("busy", "読み込み中…");
   if (!firebaseConfig) return pill("off", "ローカルモード(同期オフ)");
-  if (!user) return pill("off", "未ログイン(この端末のみ)");
   if (!online) return pill("offline", "オフライン・あとで同期します");
   if (state.pending || Date.now() < remoteBusyUntil) return pill("busy", "同期中…");
   return pill("", "同期済み");
@@ -191,6 +231,15 @@ function addForm(): HTMLFormElement | null {
 }
 
 function renderShell() {
+  if (gate) {
+    const key = `gate-${gate}-${gateBusy}-${gateMsg}`;
+    if (key !== shellKey) {
+      footObs?.disconnect();
+      shell.innerHTML = gateHTML();
+      shellKey = key;
+    }
+    return;
+  }
   const pc = mq.matches;
   const key = `${pc ? "pc" : "ph"}-${settings.layout}`;
   if (key !== shellKey) {
@@ -357,6 +406,9 @@ shell.addEventListener("input", (e) => {
 
 shell.addEventListener("click", (e) => {
   const tg = e.target as HTMLElement;
+  if (tg.closest('[data-act="login"]')) { void login(); return; }
+  if (tg.closest('[data-act="reload"]')) { location.reload(); return; }
+  if (gate) return;
   if (tg.closest('[data-act="settings"]')) { openSettings(); return; }
   const mic = tg.closest<HTMLElement>('[data-mic="add"]');
   if (mic) { voiceAdd.toggle(); return; }
@@ -523,10 +575,7 @@ function accountHTML() {
   if (!firebaseConfig) {
     return `<div class="acct"><div class="who"><b>ローカルモード(同期オフ)</b>この端末のブラウザにだけ保存しています。スマホとパソコンで同期するには、Firebase の設定が必要です(README 参照)。</div></div>`;
   }
-  if (!user) {
-    return `<div class="acct"><div class="who"><b>未ログイン</b>Google でログインすると、ほかの端末と同期できます。</div><button type="button" class="btn" data-login>Googleでログイン</button></div>`;
-  }
-  return `<div class="acct"><div class="who"><b>${esc(user.name || "ログイン中")}</b>${esc(user.email)}</div><button type="button" class="ghost" data-logout>ログアウト</button></div>`;
+  return `<div class="acct"><div class="who"><b>${esc(user?.name || "ログイン中")}</b>${esc(user?.email ?? "")}</div><button type="button" class="ghost" data-logout>ログアウト</button></div>`;
 }
 function fillSettings() {
   const scroll = settingsDlg.querySelector(".sheet-body")?.scrollTop ?? 0;
@@ -562,10 +611,6 @@ settingsDlg.addEventListener("click", async (e) => {
     app.style.removeProperty("--photo");
     if (settings.wp === "photo") settings.wp = "mesh";
     applySettings();
-    return;
-  }
-  if (tg.closest("[data-login]")) {
-    try { await cloud?.signIn(); } catch (ex) { onStoreError("ログインできませんでした", ex); }
     return;
   }
   if (tg.closest("[data-logout]")) { await cloud?.signOut(); toast("ログアウトしました"); return; }
@@ -607,26 +652,60 @@ function ask(title: string, msg: string, ok: string, cancel: string): Promise<bo
 }
 
 /* ================= クラウド(設定されているときだけ) ================= */
+async function login() {
+  if (!cloud || gateBusy) return;
+  gateBusy = true; gateMsg = ""; renderShell();
+  try {
+    await cloud.signIn();
+  } catch (ex) {
+    console.warn("ログインできませんでした", ex);
+    gateMsg = "ログインできませんでした。もう一度お試しください";
+  } finally {
+    gateBusy = false; renderShell();
+  }
+}
+
+/** クラウドのストアを外し、データを画面から消す */
+function dropCloudStore() {
+  unsubStore?.(); unsubSettings?.();
+  unsubStore = null; unsubSettings = null;
+  if (store !== localStore) store.dispose();
+  store = localStore;
+  state = { ...EMPTY_STATE };
+}
+
 async function startCloud() {
   const { initCloud } = await import("./store/cloud");
   cloud = initCloud(firebaseConfig!, useEmulator);
   if (cloud.testSignIn) (window as unknown as Record<string, unknown>).__someday = { testSignIn: cloud.testSignIn, signOut: cloud.signOut };
   cloud.onUser(async (u) => {
+    if (u && !isAllowedAccount(u.email, u.emailVerified)) {
+      // 許可されていないアカウント: すぐログアウトし、アプリ画面は描画しない(どれが許可かは出さない)
+      user = null; authResolved = true;
+      dropCloudStore();
+      gateMsg = "このアカウントでは使えません";
+      setGate("login");
+      try { await cloud!.signOut(); } catch (ex) { console.warn(ex); }
+      return;
+    }
     const changed = (u?.uid ?? null) !== (user?.uid ?? null) || !authResolved;
     user = u;
     authResolved = true;
     if (!changed) { fill(); return; }
-    if (store !== localStore) store.dispose();
+    dropCloudStore();
     if (u) {
+      gateMsg = "";
       const fs = cloud!.createStore(u.uid, onStoreError) as FirestoreStore;
       const local = localStore.snapshot();
       useStore(fs);
+      setGate(null);
       if (local.tasks.length) {
         const ok = await ask("この端末のやることを取り込みますか？", `ログイン前にこの端末で書いた ${local.tasks.length} 件があります。アカウントに取り込んで、ほかの端末と同期しますか？`, "取り込む", "今はしない");
         if (ok) { fs.importTasks(local.tasks, local.stampTotal); localStore.clearTasks(); toast(`${local.tasks.length} 件を取り込みました`); }
       }
     } else {
-      useStore(localStore);
+      // 未ログイン: クラウド設定ありのビルドでは「この端末だけ」のモードは使わず、ログイン画面だけを出す
+      setGate("login");
     }
     if (settingsDlg.open) fillSettings();
     fill();
@@ -641,7 +720,12 @@ mq.addEventListener("change", () => renderShell());
 applyTheme();
 renderShell();
 if (firebaseConfig) {
-  startCloud().catch((e) => { authResolved = true; onStoreError("クラウドに接続できませんでした", e); useStore(localStore); });
+  startCloud().catch((e) => {
+    console.warn("クラウドに接続できませんでした", e);
+    authResolved = true;
+    gateMsg = "接続できませんでした。通信状況を確かめて、再読み込みしてください";
+    setGate("error");
+  });
 } else {
   useStore(localStore);
 }

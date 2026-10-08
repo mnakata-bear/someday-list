@@ -7,16 +7,19 @@ import {
 } from "firebase/auth";
 import { connectFirestoreEmulator, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import type { FirebaseWebConfig } from "../firebase-config";
+import { ALLOWED_EMAILS } from "../core/access";
 import { FirestoreStore } from "./firestore";
 import type { ErrorSink } from "./types";
 
+export interface CloudUser { uid: string; name: string; email: string; emailVerified: boolean }
+
 export interface Cloud {
-  onUser(cb: (u: { uid: string; name: string; email: string } | null) => void): () => void;
+  onUser(cb: (u: CloudUser | null) => void): () => void;
   signIn(): Promise<void>;
   signOut(): Promise<void>;
   createStore(uid: string, onError: ErrorSink): FirestoreStore;
-  /** エミュレーター専用: Google の偽トークンでログイン(E2E テスト用) */
-  testSignIn?(sub: string): Promise<void>;
+  /** エミュレーター専用: Google の偽トークンでログイン(E2E テスト用)。email の既定は許可アカウント */
+  testSignIn?(sub: string, email?: string, emailVerified?: boolean): Promise<void>;
 }
 
 export function initCloud(cfg: FirebaseWebConfig, emulator: boolean): Cloud {
@@ -35,7 +38,7 @@ export function initCloud(cfg: FirebaseWebConfig, emulator: boolean): Cloud {
   }
   getRedirectResult(auth).catch(() => { /* リダイレクトでなければ何もしない */ });
 
-  const toInfo = (u: User | null) => (u ? { uid: u.uid, name: u.displayName ?? "", email: u.email ?? "" } : null);
+  const toInfo = (u: User | null): CloudUser | null => (u ? { uid: u.uid, name: u.displayName ?? "", email: u.email ?? "", emailVerified: u.emailVerified } : null);
 
   const cloud: Cloud = {
     onUser: (cb) => onAuthStateChanged(auth, (u) => cb(toInfo(u))),
@@ -59,8 +62,8 @@ export function initCloud(cfg: FirebaseWebConfig, emulator: boolean): Cloud {
     createStore: (uid, onError) => new FirestoreStore(db, uid, onError),
   };
   if (emulator) {
-    cloud.testSignIn = async (sub: string) => {
-      const cred = GoogleAuthProvider.credential(JSON.stringify({ sub, email: `${sub}@example.com`, email_verified: true, name: sub }));
+    cloud.testSignIn = async (sub: string, email: string = ALLOWED_EMAILS[0], emailVerified = true) => {
+      const cred = GoogleAuthProvider.credential(JSON.stringify({ sub, email, email_verified: emailVerified, name: sub }));
       await signInWithCredential(auth, cred);
     };
   }

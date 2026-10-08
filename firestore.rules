@@ -4,13 +4,22 @@ rules_version = '2';
 //   users/{uid}/tasks/{taskId}   タスク
 //   users/{uid}/meta/settings    見た目の設定
 //   users/{uid}/meta/stats       スタンプの累計
-// ログインした本人(request.auth.uid == userId)だけが読み書きできる。それ以外はすべて拒否。
+// 許可リストのメール(確認済み)でログインした本人(request.auth.uid == userId)だけが読み書きできる。それ以外はすべて拒否。
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // このアプリを使えるアカウント(Google のメール)。増やすときはこのリストに足す。
+    // クライアント側の同じリストは src/core/access.ts(見た目用。守りの本体はここ)
+    function allowedEmail() {
+      return request.auth.token.email in ['bears.sys.apps@gmail.com'];
+    }
+
     match /users/{userId} {
       function isOwner() {
-        return request.auth != null && request.auth.uid == userId;
+        return request.auth != null
+          && request.auth.uid == userId
+          && request.auth.token.email_verified == true
+          && allowedEmail();
       }
 
       function validTask(d) {

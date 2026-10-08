@@ -33,8 +33,12 @@ Web Speech API を使います。**Chrome などでは、話した音声は Goog
 
 ## モード
 
-- **クラウドモード**: `VITE_FIREBASE_*` が設定されているビルド。Google でログインすると同期します。
-  本番の設定は `.env.production` に入っています(Web の config は公開前提の値なのでリポジトリに含めています)。
+- **クラウドモード**: `VITE_FIREBASE_*` が設定されているビルド(本番)。**許可された Google アカウント(`bears.sys.apps@gmail.com`)でログインするまで、ログイン画面だけを表示**し、一覧・追加フォーム・設定などは描画しません。
+  - 許可外のアカウントでログインすると、すぐログアウトして「このアカウントでは使えません」と表示します
+  - 「未ログイン(この端末のみ)」で使うモードはありません
+  - 許可リストは `src/core/access.ts`(見た目用)と `firestore.rules` の `allowedEmail()`(守りの本体)。増やすときは両方を直す
+  - 検索エンジン避けに `noindex, nofollow` の meta と `public/robots.txt` を入れています
+  本番の設定は `.env.production` に入っています(Web の config は公開前提の値)。GitHub Actions のビルドはリポジトリの Variables から受け取ります。
 - **ローカルモード(同期オフ)**: `VITE_FIREBASE_*` が無いとき。localStorage だけで動き、ヘッダーに「ローカルモード(同期オフ)」と出ます。
   `npm run dev` とテスト用ビルドはこちらです。
 
@@ -59,7 +63,7 @@ npx -y firebase-tools@latest deploy --only firestore:rules --project itupo-app
 
 ### セキュリティルール(`firestore.rules`)
 
-- `request.auth.uid == userId` の本人だけが `users/{userId}/...` を読み書きできる。それ以外はすべて拒否
+- 許可リストのメール(`email_verified == true`)でログインし、`request.auth.uid == userId` の本人だけが `users/{userId}/...` を読み書きできる。それ以外はすべて拒否
 - タスク: `title` は 1〜100 字の文字列、`due` は `""` か `YYYY-MM-DD`、`note` は 2000 字以内の文字列、`done` は bool、日時は整数(ms)、余計なフィールドは不可
 - 設定: layout / theme / wp / stamp の4つだけ。スタンプ累計: 0 以上の整数
 
@@ -97,7 +101,7 @@ E2E(Playwright / ローカルモード): 追加→チェック→スタンプ→
 npm run test:emu
 ```
 
-Firebase Emulator(`demo-someday`。本番にはつながない)で、ルールのテストと、2つのブラウザ間のリアルタイム同期・他 uid の分離・オフライン→復帰・ログイン時の取り込みを確認します。Java が必要です。Windows では先に JAVA_HOME を設定してください(Git Bash の例):
+Firebase Emulator(`demo-someday`。本番にはつながない)で、ルールのテスト(許可外メール・メール未確認の拒否を含む)と、ログイン画面(未ログイン / 許可アカウント / 許可外アカウント)、2つのブラウザ間のリアルタイム同期・他 uid の分離・オフライン→復帰・ログイン時の取り込みを確認します。Java が必要です。Windows では先に JAVA_HOME を設定してください(Git Bash の例):
 
 ```bash
 export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr"
