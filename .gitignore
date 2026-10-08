@@ -12,3 +12,8 @@ dist-e2e/
 dist-emu/
 dist-gate-e2e/
 dist-entrance/
+
+# 通知用のサービスアカウント鍵(絶対にコミットしない)
+key.json
+.someday-notify/
+notify/node_modules/

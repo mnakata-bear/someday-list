@@ -1,0 +1,18 @@
+{
+  "name": "someday-notify",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "毎朝、未完了の「いつかやること」を Windows のウィンドウで知らせる(アプリ本体とは独立)",
+  "scripts": {
+    "start": "node index.mjs",
+    "demo": "node index.mjs --demo",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.7"
+  }
+}
