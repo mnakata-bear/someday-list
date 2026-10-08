@@ -3,18 +3,21 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "vite",
+    "dev:gate": "vite -c vite.entrance.config.ts",
     "build": "vite build",
+    "build:pages": "node scripts/build-pages.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "icons": "node scripts/make-icons.mjs",
     "test": "vitest run",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test && playwright test -c playwright.gate.config.ts",
     "test:emu": "firebase emulators:exec --only auth,firestore --project demo-someday \"npx vitest run -c vitest.rules.config.ts && npx playwright test -c playwright.emulator.config.ts\"",
     "test:all": "npm run test && npm run test:e2e && npm run test:emu",
     "dev:cloud": "vite --mode production",
     "test:rules": "firebase emulators:exec --only firestore --project demo-someday \"npx vitest run -c vitest.rules.config.ts\"",
     "deploy:rules": "firebase deploy --only firestore:rules --project itupo-app",
-    "screenshots": "node scripts/screenshots.mjs"
+    "screenshots": "node scripts/screenshots.mjs",
+    "test:gate": "playwright test -c playwright.gate.config.ts"
   },
   "keywords": [],
   "author": "",

@@ -3,6 +3,7 @@ import { VitePWA } from "vite-plugin-pwa";
 
 // GitHub Pages(https://mnakata-bear.github.io/someday-list/)向けに、ビルド時の既定 base は /someday-list/
 // 変えたいときは環境変数 BASE_PATH(例: BASE_PATH=/ npm run build)で指定する
+// 本番(GitHub Actions)は scripts/build-pages.mjs が BASE_PATH=/someday-list/app-<slug>/ にしてビルドする
 export default defineConfig(({ command, mode, isPreview }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const base = process.env.BASE_PATH || env.BASE_PATH || (command === "build" || isPreview ? "/someday-list/" : "/");
@@ -19,8 +20,9 @@ export default defineConfig(({ command, mode, isPreview }) => {
           short_name: "いつかやること",
           description: "期限はあってもなくてもいい、「いつかやりたいこと」を書きためるリスト",
           lang: "ja",
-          start_url: ".",
-          scope: ".",
+          // 公開時は /someday-list/app-<slug>/(入口ページの下)。ホーム画面に追加するとここから直接ひらく
+          start_url: base,
+          scope: base,
           display: "standalone",
           orientation: "any",
           background_color: "#f2f8fe",

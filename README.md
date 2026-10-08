@@ -3,7 +3,7 @@
 期限はあってもなくてもいい「いつかやりたいこと」を書きためるリストです。
 スマホとパソコンで同期でき(Firebase)、ホーム画面に追加してアプリのように使えます(PWA)。
 
-- 公開予定: https://mnakata-bear.github.io/someday-list/
+- 公開: https://mnakata-bear.github.io/someday-list/ (入口ページ。合言葉を入れるとアプリがひらく)
 - デザイン: `G:\AI\mock_todo_sync\index.html`(確定モック)を移植
 - 構成: Vite + TypeScript(フレームワークなし) / Firebase Authentication(Google)+ Cloud Firestore / vite-plugin-pwa
 
@@ -42,6 +42,27 @@ Web Speech API を使います。**Chrome などでは、話した音声は Goog
 - **ローカルモード(同期オフ)**: `VITE_FIREBASE_*` が無いとき。localStorage だけで動き、ヘッダーに「ローカルモード(同期オフ)」と出ます。
   `npm run dev` とテスト用ビルドはこちらです。
 
+## 入口ページ(合言葉)
+
+公開 URL のルートは「入口ページ(表紙)」です。「はじめる」→ 合言葉を入れると、アプリ本体へ移動します。
+
+- アプリ本体の置き場所は合言葉から決まります: `slug = SHA-256("someday-list:" + 合言葉)` の16進の先頭24文字、置き場所は `/someday-list/app-<slug>/`
+  - 入口ページは入力された合言葉から同じ計算(Web Crypto)をして、`app-<slug>/` があれば(HEAD が 200)移動、無ければ(404)「合言葉が違います」
+  - 合言葉も slug も、リポジトリには入れていません。GitHub Actions が secret `APP_PASSPHRASE` から計算します(ログでは伏せ字)
+  - 合言葉の前後の空白は無視します。大文字・小文字は区別します
+- 一度通った端末は slug を localStorage に覚え、次からは聞かずにアプリへ移動します。合言葉が変わって 404 になったら、記憶を消して入口に戻ります
+  - 記憶を消すには、アプリの設定(歯車)→「この端末の合言葉の記憶を消す」
+- ホーム画面に追加(PWA)はアプリ側で行います。manifest の `scope` / `start_url` は `app-<slug>/` なので、ホーム画面からは入口を通らずにひらきます
+- 以前ルート(`/someday-list/`)に登録されていたアプリの Service Worker は、入口に置いた同じ名前の `sw.js`(自己解除版)と入口ページ自身が解除します
+- **これは「URL を知らない人を入れない」ための軽い仕組みです。** データを守っているのは、これまでどおり Google ログインの壁と Firestore のルールです
+
+### 合言葉の変え方
+
+GitHub の Settings → Secrets and variables → Actions → Secrets の `APP_PASSPHRASE` を更新して、Actions の「Deploy to GitHub Pages」を再実行(Run workflow)します。
+
+- アプリの URL(slug)も変わります。ホーム画面に追加していた場合は、入口から入り直して追加し直してください
+- 覚えていた端末は、次に入口を開いたときに古い slug が 404 になり、合言葉を聞き直します
+
 ## Firebase の準備(手順の記録)
 
 本番プロジェクト `itupo-app` は作成済みです。新しく作り直すときの手順:
@@ -77,7 +98,15 @@ npm install
 npm run dev
 ```
 
-http://localhost:5173/ で開きます(ローカルモード)。本番の Firebase につないで試すときは `npm run dev:cloud`(Google ログインは本番のアカウントに書き込みます)。
+http://localhost:5173/ で開きます(ローカルモード。入口ページなしでアプリだけが動きます)。
+
+入口ページだけを見るとき(http://localhost:5174/someday-list/ 。アプリは無いので、どの合言葉も「違います」になります):
+
+```bash
+npm run dev:gate
+```
+
+本番と同じ形(入口+アプリ)を手元で組み立てるときは、環境変数 `APP_PASSPHRASE`(試し用の値)を付けて `npm run build:pages` を実行します(`OUT_DIR` で出力先、`APP_MODE=e2e` でローカルモードのアプリ)。本番の Firebase につないで試すときは `npm run dev:cloud`(Google ログインは本番のアカウントに書き込みます)。
 
 ## テスト
 
@@ -95,7 +124,9 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-E2E(Playwright / ローカルモード): 追加→チェック→スタンプ→取消→編集→削除→元に戻す→リロード、メモ、テーマ等の切替と保存、写真壁紙、音声入力(SpeechRecognition はモック)、375px で横スクロールなし、900px でPC/スマホ切替、Service Worker でのオフライン起動。
+E2E(Playwright / ローカルモード): `test:e2e` はアプリの E2E と入口ページの E2E(`playwright.gate.config.ts`)の両方を動かします。入口ページの E2E は、テスト用のダミー合言葉で入口+アプリを組み立てて、GitHub Pages に近い静的サーバー(`scripts/serve-pages.mjs`)で確認します(正しい合言葉→アプリ、間違い→エラー、2回目は自動でアプリへ、覚えた slug が 404 なら入口へ、旧 SW の解除、375px)。
+
+アプリの E2E: 追加→チェック→スタンプ→取消→編集→削除→元に戻す→リロード、メモ、テーマ等の切替と保存、写真壁紙、音声入力(SpeechRecognition はモック)、375px で横スクロールなし、900px でPC/スマホ切替、Service Worker でのオフライン起動。
 
 ```bash
 npm run test:emu
@@ -120,22 +151,25 @@ npm run screenshots
 ## デプロイ(GitHub Pages)
 
 - ビルドの既定の base は `/someday-list/`(変えるときは `BASE_PATH=/xxx/ npm run build`)
-- `.github/workflows/deploy.yml` が main への push でテスト→ビルド→Pages へ公開します
+- `.github/workflows/deploy.yml` が main への push でテスト→ secret `APP_PASSPHRASE` から slug を計算→ `scripts/build-pages.mjs` で入口(`dist/`)とアプリ(`dist/app-<slug>/`)をビルド→ Pages へ公開します
+- secret `APP_PASSPHRASE` が無いとビルドは失敗します
 - 初回だけ GitHub のリポジトリで Settings → Pages → Source を「GitHub Actions」にしてください
 
 ## ファイル構成
 
 ```text
+entrance/            入口ページ(表紙+合言葉。index.html / main.ts / style.css、public/sw.js は旧 SW の自己解除版)
 src/
   main.ts            画面の組み立て・イベント・設定パネル・編集シート
   styles.css         モックから移植したスタイル
   firebase-config.ts VITE_FIREBASE_* を読む(未設定ならローカルモード)
-  core/              純粋関数(themes / logic: 期限・並び順・スタンプ・入力チェック / spoken: 音声の期限読み取り)
+  core/              純粋関数(themes / logic: 期限・並び順・スタンプ・入力チェック / spoken: 音声の期限読み取り / gate-slug: 合言葉→slug)
   store/             ストレージ層(types: 共通インターフェース / local: LocalStore / firestore: FirestoreStore / cloud: 初期化とログイン)
   ui/                icons / photo(IndexedDB) / voice(Web Speech API)
+scripts/             slug.mjs(合言葉→slug の Node 版) / build-pages.mjs(入口+アプリをまとめてビルド) / serve-pages.mjs(E2E 用の静的サーバー)
 public/icons/        PWA アイコン(scripts/make-icons.mjs で生成)
 tests/unit/          Vitest
 tests/rules/         firestore.rules のテスト(Emulator)
-e2e/                 Playwright(local.spec.ts / emulator.spec.ts)
+e2e/                 Playwright(local.spec.ts / emulator.spec.ts / gate.spec.ts)
 firestore.rules, firebase.json, .firebaserc, firestore.indexes.json
 ```

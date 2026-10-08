@@ -10,5 +10,5 @@
     "isolatedModules": true,
     "types": ["vite/client"]
   },
-  "include": ["src", "tests", "e2e", "vite.config.ts", "playwright*.ts", "vitest*.ts"]
+  "include": ["src", "entrance", "tests", "e2e", "vite.config.ts", "playwright*.ts", "vitest*.ts"]
 }

@@ -15,6 +15,7 @@ import { firebaseConfig, useEmulator } from "./firebase-config";
 import { clearPhoto, loadPhoto, savePhoto } from "./ui/photo";
 import { Voice, speechSupported } from "./ui/voice";
 import * as I from "./ui/icons";
+import { forgetSlug, loadSavedSlug } from "./core/gate-slug";
 
 /* ================= 状態 ================= */
 const app = document.getElementById("app") as HTMLElement;
@@ -591,6 +592,7 @@ function fillSettings() {
       <p class="hint">「自分の写真」は<b>この端末の中だけ</b>に保存されます(クラウドには上げません)。${photoURL ? ' <button type="button" class="linkbtn" data-photo-change>写真を変える</button> <button type="button" class="linkbtn" data-photo-clear>写真を消す</button>' : ""}</p>
       <div class="crow"><span>スタンプ</span><div class="seg" role="group" aria-label="スタンプ">${Object.entries(STAMPS).map(([k, s]) => `<button type="button" data-k="stamp" data-v="${k}" aria-pressed="${settings.stamp === k}">${s.n}</button>`).join("")}</div></div>
       <div class="crow"><span>同期</span>${accountHTML()}</div>
+      <div class="crow"><span>入口</span><div class="gmem"><div class="who"><b>合言葉の記憶</b>${loadSavedSlug() ? "この端末は合言葉を覚えています(入口で聞かずにひらきます)。" : "この端末は合言葉を覚えていません。"}</div><button type="button" class="ghost" data-forget-gate${loadSavedSlug() ? "" : " disabled"}>この端末の合言葉の記憶を消す</button></div></div>
       <p class="hint">音声入力について: Chrome などでは、話した音声は Google のサーバーで文字に変換されます。</p>
     </div></div>`;
   const body = settingsDlg.querySelector(".sheet-body");
@@ -613,6 +615,7 @@ settingsDlg.addEventListener("click", async (e) => {
     applySettings();
     return;
   }
+  if (tg.closest("[data-forget-gate]")) { forgetSlug(); fillSettings(); toast("この端末の合言葉の記憶を消しました"); return; }
   if (tg.closest("[data-logout]")) { await cloud?.signOut(); toast("ログアウトしました"); return; }
   const b = tg.closest<HTMLElement>("[data-k]");
   if (!b) return;

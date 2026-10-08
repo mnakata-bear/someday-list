@@ -27,10 +27,21 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      # リポジトリ名と違うパスで公開するときは BASE_PATH を変える
-      - run: npm run build
+      # 合言葉(secret APP_PASSPHRASE)から、アプリの置き場所 app-<slug>/ を決める。
+      # 合言葉も slug もログに出さない(secret は自動で、slug は add-mask で伏せ字になる)
+      - name: 合言葉から置き場所を計算
         env:
-          BASE_PATH: /someday-list/
+          APP_PASSPHRASE: ${{ secrets.APP_PASSPHRASE }}
+        run: |
+          if [ -z "$APP_PASSPHRASE" ]; then echo "::error::secret APP_PASSPHRASE が未設定です"; exit 1; fi
+          SLUG="$(node scripts/slug.mjs)"
+          echo "::add-mask::$SLUG"
+          echo "APP_SLUG=$SLUG" >> "$GITHUB_ENV"
+      # 入口ページを dist 直下(/someday-list/)、アプリを dist/app-<slug>/ にビルドして 1 つにまとめる
+      - name: ビルド(入口ページ+アプリ)
+        run: node scripts/build-pages.mjs
+        env:
+          OUT_DIR: dist
           # Firebase の Web config はリポジトリの Variables(Settings → Secrets and variables → Actions)から渡す
           VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}

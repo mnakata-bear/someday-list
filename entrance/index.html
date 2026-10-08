@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>いつかやること</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#f2f8fe">
+<meta name="color-scheme" content="light">
+<link rel="icon" type="image/png" sizes="32x32" href="../public/icons/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=M+PLUS+1p:wght@400;500;700&family=Shippori+Mincho:wght@600&display=swap" rel="stylesheet">
+</head>
+<body>
+<main class="cover" id="cover" data-state="intro" data-testid="cover">
+  <div class="mist" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+  <div class="grain" aria-hidden="true"></div>
+
+  <section class="card" aria-labelledby="cv-title">
+    <p class="eyebrow rv" style="--d:0">Someday&nbsp;List</p>
+    <div class="mark rv" style="--d:1"><img src="../public/icons/app-icon.webp" alt="" width="104" height="104"></div>
+    <h1 class="title rv" id="cv-title" style="--d:2">いつかやること</h1>
+    <p class="lead rv" style="--d:3"><span class="ph">期限はあってもなくてもいい。</span><br><span class="ph">いつかやりたいことを、</span><span class="ph">そっと書きためる場所。</span></p>
+
+    <div class="act rv" style="--d:4">
+      <button type="button" class="pill" id="start" data-testid="start">
+        <span>はじめる</span>
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+
+      <div class="opening" id="opening" role="status" data-testid="opening" hidden><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>ひらいています</div>
+
+      <form class="pass" id="pass" data-testid="pass" hidden novalidate>
+        <label class="pass-label" for="pw">合言葉</label>
+        <div class="field" id="field">
+          <svg class="lock" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="3" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+          <input id="pw" name="pw" type="password" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" placeholder="合言葉を入力" aria-describedby="pw-msg" required>
+          <button type="button" class="eye" id="eye" aria-label="合言葉を表示する" aria-pressed="false">
+            <svg class="eye-on" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+            <svg class="eye-off" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 4l16 16M10.6 6.1A9.6 9.6 0 0 1 12 6c6 0 9.5 6 9.5 6a17 17 0 0 1-3 3.6M6.4 7.9A16.6 16.6 0 0 0 2.5 12S6 18 12 18a9 9 0 0 0 4-1M9.9 9.9a3 3 0 0 0 4.2 4.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+        <button type="submit" class="pill go" id="go" data-testid="go"><span>ひらく</span></button>
+        <p class="msg" id="pw-msg" role="alert" data-testid="msg" hidden></p>
+      </form>
+    </div>
+  </section>
+
+</main>
+<noscript><p class="nojs">このページを使うには JavaScript を有効にしてください。</p></noscript>
+<script type="module" src="./main.ts"></script>
+</body>
+</html>

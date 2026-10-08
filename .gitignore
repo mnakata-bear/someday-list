@@ -10,3 +10,5 @@ playwright-report/
 firestore-debug.log
 dist-e2e/
 dist-emu/
+dist-gate-e2e/
+dist-entrance/

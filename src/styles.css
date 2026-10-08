@@ -240,6 +240,7 @@ dialog.sheet::backdrop { background: rgb(12 18 32/.38); backdrop-filter: blur(4p
 
 .ghost { height: 40px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--border); background: transparent; cursor: pointer; font-weight: 700; font-size: 13px; color: var(--text); transition: all .18s var(--ease); white-space: nowrap }
 .ghost:hover { border-color: var(--a1); color: var(--a1) }
+.ghost:disabled { opacity: .5; cursor: default; border-color: var(--border); color: var(--muted) }
 .ghost:focus-visible, .dghost:focus-visible { outline: 3px solid var(--soft); outline-offset: 2px }
 .dghost { height: 40px; padding: 0 14px; border-radius: 999px; border: 0; background: transparent; cursor: pointer; font-weight: 700; font-size: 13px; color: var(--danger); display: inline-flex; align-items: center; gap: 6px }
 .dghost:hover { background: color-mix(in srgb, var(--danger) 10%, transparent) }
@@ -281,9 +282,9 @@ dialog.sheet::backdrop { background: rgb(12 18 32/.38); backdrop-filter: blur(4p
 .sheet button:focus-visible { outline: 3px solid var(--a1); outline-offset: 2px }
 .hint { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.7 }
 .hint b { color: var(--text) }
-.acct { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: var(--surface2); border: 1px solid var(--border); border-radius: 16px; padding: 12px 14px }
-.acct .who { font-size: 13px; min-width: 0; word-break: break-all }
-.acct .who b { display: block; font-size: 14px }
+.acct, .gmem { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: var(--surface2); border: 1px solid var(--border); border-radius: 16px; padding: 12px 14px }
+.acct .who, .gmem .who { font-size: 13px; min-width: 0; word-break: break-all }
+.acct .who b, .gmem .who b { display: block; font-size: 14px }
 @media (max-width: 700px) { .crow { grid-template-columns: 1fr; gap: 8px } }
 
 /* 確認ダイアログ */

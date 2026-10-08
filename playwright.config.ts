@@ -4,7 +4,7 @@ import { defineConfig, devices } from "@playwright/test";
 const PORT = 4173;
 export default defineConfig({
   testDir: "e2e",
-  testIgnore: ["**/emulator.spec.ts"],
+  testIgnore: ["**/emulator.spec.ts", "**/gate.spec.ts"],
   timeout: 30_000,
   fullyParallel: true,
   reporter: [["list"]],
