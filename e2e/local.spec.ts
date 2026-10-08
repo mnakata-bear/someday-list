@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { addTask, item, speechMock, ymd } from "./helpers";
+import { addTask, item, openAdder, speechMock, ymd } from "./helpers";
 import { parseSpoken } from "../src/core/spoken";
 
 test.describe("ローカルモード(PC幅)", () => {
@@ -26,9 +26,10 @@ test.describe("ローカルモード(PC幅)", () => {
     await expect(page.locator(".list .item .title").first()).toHaveText("パスポートを更新する");
 
     // 空のタイトルはエラー
-    await addTask(page, "   ");
+    await addTask(page, "   ", "", true);
     await expect(page.locator('form[data-form="add"] .ferr')).toHaveText("やることを入力してください");
     await expect(page.locator(".list .item")).toHaveCount(2);
+    await page.keyboard.press("Escape");
 
     // チェック → スタンプ表示・スタンプカード +1
     const scard = page.getByTestId("scard");
@@ -199,6 +200,7 @@ test.describe("音声入力(SpeechRecognition をモック)", () => {
     await page.goto("./");
     const text = "来週の金曜までに歯医者を予約";
     await page.evaluate((t) => { (window as unknown as { __speech: { text: string } }).__speech.text = t; }, text);
+    await openAdder(page);
     const mic = page.locator('[data-mic="add"]');
     await expect(mic).toBeVisible();
     const box = await mic.boundingBox();
@@ -224,6 +226,7 @@ test.describe("音声入力(SpeechRecognition をモック)", () => {
     await page.addInitScript(speechMock);
     await page.goto("./");
     await page.evaluate(() => { (window as unknown as { __speech: { error: string } }).__speech.error = "not-allowed"; });
+    await openAdder(page);
     await page.locator('[data-mic="add"]').click();
     await expect(page.locator(".toast")).toContainText("マイクの使用が許可されていません");
     await expect(page.locator('[data-mic="add"]')).not.toHaveClass(/\bon\b/);
@@ -255,13 +258,14 @@ test.describe("音声入力(SpeechRecognition をモック)", () => {
       Object.defineProperty(window, "SpeechRecognition", { value: undefined, configurable: true });
     });
     await page.goto("./");
+    await openAdder(page);
     await expect(page.locator('form[data-form="add"]')).toBeVisible();
     await expect(page.locator('[data-mic="add"]')).toHaveCount(0);
   });
 });
 
 test.describe("レスポンシブ", () => {
-  test("375px 幅: スマホ用レイアウト・横スクロールなし・追加フォームは下に固定", async ({ page }) => {
+  test("375px 幅: スマホ用レイアウト・横スクロールなし・追加は右下の「＋」", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto("./");
     await addTask(page, "とても長いタイトルのやることを入れても横にはみ出さないことを確認するためのテキストですよ");
@@ -272,10 +276,13 @@ test.describe("レスポンシブ", () => {
     const sw = await page.evaluate(() => [document.documentElement.scrollWidth, document.body.scrollWidth, window.innerWidth]);
     expect(sw[0]).toBeLessThanOrEqual(375);
     expect(sw[1]).toBeLessThanOrEqual(375);
-    const foot = page.locator(".ph-foot");
-    expect(await foot.evaluate((el) => getComputedStyle(el).position)).toBe("fixed");
-    const fb = await foot.boundingBox();
-    expect(Math.round(fb!.y + fb!.height)).toBe(812);
+    const fab = page.locator("#fab");
+    expect(await fab.evaluate((el) => getComputedStyle(el).position)).toBe("fixed");
+    const fb = await fab.boundingBox();
+    expect(Math.round(fb!.width)).toBe(56);
+    expect(Math.round(fb!.x + fb!.width)).toBe(375 - 16);
+    expect(Math.round(fb!.y + fb!.height)).toBe(812 - 16);
+    await expect(page.locator(".ph-foot")).toHaveCount(0);
     // 設定シートを開いても横にはみ出さない
     await page.locator('[data-act="settings"]').click();
     const dlg = await page.locator("#settings").boundingBox();
@@ -289,6 +296,7 @@ test.describe("レスポンシブ", () => {
     await expect(page.locator(".pc-in")).toBeVisible();
     await expect(page.locator(".ph")).toHaveCount(0);
     // 入力途中の文字は、レイアウトが切り替わっても消えない
+    await openAdder(page);
     await page.locator('input[name="t"]').fill("入力途中");
     await page.setViewportSize({ width: 899, height: 800 });
     await expect(page.locator(".ph")).toBeVisible();

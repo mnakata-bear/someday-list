@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { addTask, item } from "./helpers";
+import { addTask, item, openAdder } from "./helpers";
 
 test.describe("ラベル(ローカルモード)", () => {
   test("追加時にラベル→チップ表示→編集で変更→絞り込み→リロード後も維持", async ({ page }) => {
@@ -7,6 +7,7 @@ test.describe("ラベル(ローカルモード)", () => {
     const form = page.locator('form[data-form="add"]');
     const work = form.locator('[data-lbl="work"]');
     const priv = form.locator('[data-lbl="private"]');
+    await openAdder(page);
 
     // タップ領域は 44px 以上。もう一度押すと未設定に戻る
     expect((await work.boundingBox())!.height).toBeGreaterThanOrEqual(44);
@@ -23,9 +24,11 @@ test.describe("ラベル(ローカルモード)", () => {
     await expect(work).toHaveAttribute("aria-pressed", "true");
     await addTask(page, "会議室を予約");
     await expect(item(page, "会議室").locator(".lchip")).toHaveText("仕事");
+    await openAdder(page);
     await priv.click();
     await expect(work).toHaveAttribute("aria-pressed", "false");
     await addTask(page, "旅行の計画");
+    await openAdder(page);
     await priv.click(); // 未設定へ
     await expect(priv).toHaveAttribute("aria-pressed", "false");
     await addTask(page, "ラベルなしの用事");
@@ -106,14 +109,16 @@ test.describe("ラベル(ローカルモード)", () => {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto("./");
     const form = page.locator('form[data-form="add"]');
+    await openAdder(page);
     await form.locator('[data-lbl="private"]').click();
     for (let i = 0; i < 3; i++) await addTask(page, `とても長いタイトルのやることを入れてもラベルがあっても横にはみ出さないことを確認 ${i}`, "2030-01-0" + (i + 1));
+    await openAdder(page);
     await form.locator('[data-lbl="private"]').click();
     await form.locator('[data-lbl="work"]').click();
-    await addTask(page, "仕事の用事");
     for (const k of ["work", "private"]) {
       expect((await form.locator(`[data-lbl="${k}"]`).boundingBox())!.height).toBeGreaterThanOrEqual(44);
     }
+    await addTask(page, "仕事の用事");
     expect((await page.locator('[data-flt="work"]').boundingBox())!.height).toBeGreaterThanOrEqual(44);
     const sw = () => page.evaluate(() => [document.documentElement.scrollWidth, document.body.scrollWidth]);
     expect((await sw())[0]).toBeLessThanOrEqual(375);
@@ -151,6 +156,7 @@ test.describe("ラベル(ローカルモード)", () => {
     await page.locator('[data-act="settings"]').click();
     await page.locator('#settings [data-k="layout"][data-v="c"]').click();
     await page.keyboard.press("Escape");
+    await openAdder(page);
     await page.locator('.lblpick [data-lbl="work"]').click();
     await addTask(page, "Cレイアウトの仕事");
     await expect(item(page, "Cレイアウト").locator(".lchip")).toHaveText("仕事");

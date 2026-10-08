@@ -9,12 +9,25 @@ export function ymd(page: Page, n: number): Promise<string> {
   }, n);
 }
 
-/** 追加フォームから 1 件追加 */
-export async function addTask(page: Page, title: string, due = "") {
+/** 「＋」ボタンで追加シートを開く(開いていれば何もしない) */
+export async function openAdder(page: Page) {
+  const dlg = page.locator("#adder");
+  if (!(await dlg.evaluate((d) => (d as HTMLDialogElement).open))) await page.locator("#fab").click();
+  await page.locator('form[data-form="add"]').waitFor({ state: "visible" });
+  await page.waitForTimeout(400); // 開くアニメーション(約0.3秒)が終わるのを待つ
+}
+
+/** 追加シートから 1 件追加。keep=true ならシートを開いたままにする(既定は Esc で閉じる) */
+export async function addTask(page: Page, title: string, due = "", keep = false) {
+  await openAdder(page);
   const form = page.locator('form[data-form="add"]');
   await form.locator('input[name="t"]').fill(title);
   await form.locator('input[name="d"]').fill(due);
   await form.locator('button[type="submit"]').click();
+  if (!keep) {
+    await page.keyboard.press("Escape");
+    await page.locator("#adder").waitFor({ state: "hidden" });
+  }
 }
 
 export const item = (page: Page, title: string) => page.locator(".list .item", { has: page.locator(".title", { hasText: title }) });

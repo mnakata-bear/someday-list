@@ -26,6 +26,8 @@ const toastEl = document.getElementById("toast") as HTMLElement;
 const settingsDlg = document.getElementById("settings") as HTMLDialogElement;
 const editorDlg = document.getElementById("editor") as HTMLDialogElement;
 const askDlg = document.getElementById("ask") as HTMLDialogElement;
+const adderDlg = document.getElementById("adder") as HTMLDialogElement;
+const fabEl = document.getElementById("fab") as HTMLButtonElement;
 const photoInput = document.getElementById("photo") as HTMLInputElement;
 const ICON = `${import.meta.env.BASE_URL}icons/app-icon.webp`;
 const mq = matchMedia("(min-width: 900px)");
@@ -111,17 +113,22 @@ const formHTML = () => `<form class="add" data-form="add" novalidate autocomplet
   <div class="lblpick" role="group" aria-label="ラベル(任意)">${(["work", "private"] as const).map((k) => `<button type="button" class="lpill ${k}" data-lbl="${k}" aria-pressed="false">${LABELS[k]}</button>`).join("")}</div><button class="btn" type="submit">追加</button>
   <p class="ferr" role="alert" hidden></p></form>`;
 
+/** 追加フォームを入れたシート(スマホは下から、PCは中央)。ログイン画面では中身ごと無い */
+const adderHTML = () => `<div class="sheet-in">
+  <div class="grab"></div>
+  <div class="sheet-head"><div><small>Add</small><h2 id="ad-h">やることを追加</h2></div><span class="okmsg" role="status" aria-live="polite" data-testid="added"></span><button type="button" class="iconbtn x" data-close aria-label="閉じる">${I.close}</button></div>
+  <div class="sheet-body">${formHTML()}</div></div>`;
+
 function pcA() {
   return `<main class="pc-in">
     <header class="hello gl"><div class="brandrow"><img class="appicon" src="${ICON}" alt="" width="44" height="44"><div><small>Someday List</small><h1>いつかやること</h1></div></div><div class="hacts"><span data-r="sync"></span>${stampBtn}${gearBtn}</div></header>
     <section class="card pline gl" data-r="progLine" aria-label="達成状況"></section>
-    <div class="addbox gl">${formHTML()}</div>
     <section data-r="list" aria-label="やることの一覧"></section></main>`;
 }
 function pcC() {
   return `<main class="pc-in">
     <section class="card hero gl"><div class="lab"><span class="brandrow" style="gap:10px"><img class="appicon" style="width:32px;height:32px;border-radius:9px" src="${ICON}" alt="" width="32" height="32"><small>Someday List</small></span><span class="hacts"><span data-r="sync"></span>${stampBtn}${gearBtn}</span></div><h1>いつか、ちゃんとやる。</h1><div data-r="statsC"></div></section>
-    <section class="card t-list gl"><div class="lab">いつかやること</div>${formHTML()}<div style="height:10px"></div><div data-r="list"></div></section>
+    <section class="card t-list gl"><div class="lab">いつかやること</div><div data-r="list"></div></section>
     <section class="card t-next gl"><div class="lab">期限つき</div><div data-r="next"></div></section></main>`;
 }
 function phone() {
@@ -129,7 +136,7 @@ function phone() {
     <header class="ph-head gl"><div class="brandrow"><img class="appicon" src="${ICON}" alt="" width="36" height="36"><div><small>Someday</small><h1>いつかやること</h1></div></div><span class="ph-r2"><span data-r="sync"></span>${stampBtn}</span>${gearBtn}</header>
     <section class="card ph-card pline gl" data-r="progLine" aria-label="達成状況"></section>
     <section data-r="list" aria-label="やることの一覧"></section>
-  </div><footer class="ph-foot gl">${formHTML()}</footer></div>`;
+  </div></div>`;
 }
 
 const googleG = `<svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>`;
@@ -155,7 +162,7 @@ function setGate(g: Gate) {
   if (g && !gate) {
     // アプリ画面からログイン画面へ: 開いているシートや音声入力を閉じる
     voiceAdd.abort(); voiceNote.abort();
-    [settingsDlg, editorDlg, askDlg].forEach((d) => { if (d.open) d.close(); });
+    [settingsDlg, editorDlg, askDlg, adderDlg].forEach((d) => { if (d.open) d.close(); });
   }
   gate = g;
   applyTheme();
@@ -188,7 +195,8 @@ function itemHTML(t: Task, now: number) {
     <button type="button" class="ebtn" data-edit="${esc(t.id)}" aria-label="「${esc(t.title)}」を編集">${I.pencil}</button>${stamp}</li>`;
 }
 
-const emptyHTML = `<div class="empty"><b>まっさら！</b>いつかやりたいことを、気軽に書いておきましょう</div>`;
+const addCta = `<button type="button" class="addcta" data-add-open>＋ やることを追加</button>`;
+const emptyHTML = `<div class="empty"><b>まっさら！</b>いつかやりたいことを、気軽に書いておきましょう${addCta}</div>`;
 const loadingHTML = `<div class="loading" role="status"><span class="spin"></span>読み込み中…</div>`;
 
 function listHTML(now: number) {
@@ -197,7 +205,7 @@ function listHTML(now: number) {
   const tabs = `<div class="ftabs" role="group" aria-label="ラベルで絞り込み" data-testid="ftabs">${([["all", "すべて"], ["work", LABELS.work], ["private", LABELS.private]] as const)
     .map(([k, n]) => `<button type="button" class="lpill ${k}" data-flt="${k}" aria-pressed="${filter === k}">${n}<em>${c[k]}</em></button>`).join("")}</div>`;
   const l = sortTasks(filterTasks(state.tasks, filter));
-  const empty = state.tasks.length ? `<div class="empty"><b>${filter === "all" ? "まっさら！" : `${LABELS[filter]}のやることはまだありません`}</b>追加するときに、ラベルを付けられます</div>` : emptyHTML;
+  const empty = state.tasks.length ? `<div class="empty"><b>${filter === "all" ? "まっさら！" : `${LABELS[filter]}のやることはまだありません`}</b>追加するときに、ラベルを付けられます${addCta}</div>` : emptyHTML;
   return tabs + (l.length ? `<ul class="list">${l.map((t) => itemHTML(t, now)).join("")}</ul>` : empty);
 }
 
@@ -250,19 +258,18 @@ const REGIONS: Record<string, (now: number) => string> = {
 /* ================= 描画 ================= */
 let shellKey = "";
 const lastHTML = new WeakMap<Element, string>();
-let footObs: ResizeObserver | null = null;
 
 function addForm(): HTMLFormElement | null {
-  return shell.querySelector('form[data-form="add"]');
+  return adderDlg.querySelector('form[data-form="add"]');
 }
 
 function renderShell() {
   if (gate) {
     closeDrawer(false);
+    adderDlg.innerHTML = ""; fabEl.hidden = true;
     drawerEl.querySelectorAll<HTMLElement>("[data-r]").forEach((el) => { el.innerHTML = ""; lastHTML.delete(el); });
     const key = `gate-${gate}-${gateBusy}-${gateMsg}`;
     if (key !== shellKey) {
-      footObs?.disconnect();
       shell.innerHTML = gateHTML();
       shellKey = key;
     }
@@ -271,24 +278,11 @@ function renderShell() {
   const pc = mq.matches;
   const key = `${pc ? "pc" : "ph"}-${settings.layout}`;
   if (key !== shellKey) {
-    const f = addForm();
-    const saved = f ? { t: (f.elements.namedItem("t") as HTMLInputElement).value, d: (f.elements.namedItem("d") as HTMLInputElement).value, focus: document.activeElement === f.elements.namedItem("t") } : null;
-    voiceAdd.abort();
     shell.innerHTML = pc ? (settings.layout === "a" ? pcA() : pcC()) : phone();
     shellKey = key;
-    const nf = addForm();
-    if (saved && nf) {
-      (nf.elements.namedItem("t") as HTMLInputElement).value = saved.t;
-      (nf.elements.namedItem("d") as HTMLInputElement).value = saved.d;
-      if (saved.focus) (nf.elements.namedItem("t") as HTMLInputElement).focus();
-    }
-    footObs?.disconnect();
-    const foot = shell.querySelector(".ph-foot");
-    if (foot && "ResizeObserver" in window) {
-      footObs = new ResizeObserver(() => app.style.setProperty("--foot-h", `${(foot as HTMLElement).offsetHeight}px`));
-      footObs.observe(foot);
-    }
   }
+  if (!adderDlg.firstElementChild) adderDlg.innerHTML = adderHTML(); // 入力途中の文字は、レイアウトが変わっても残る
+  fabEl.hidden = false;
   fill();
 }
 
@@ -353,7 +347,7 @@ function fill() {
     el.innerHTML = html;
   });
   const al = effectiveAddLabel();
-  shell.querySelectorAll<HTMLButtonElement>(".lblpick .lpill[data-lbl]").forEach((b) => {
+  adderDlg.querySelectorAll<HTMLButtonElement>(".lblpick .lpill[data-lbl]").forEach((b) => {
     b.setAttribute("aria-pressed", String(b.dataset.lbl === al));
     b.disabled = filter !== "all"; // 絞り込み中は、そのラベルで追加する
     b.title = filter !== "all" ? "絞り込み中は、そのラベルで追加されます" : "";
@@ -461,7 +455,26 @@ shell.addEventListener("change", (e) => {
   store.setDone(id, cb.checked);
 });
 
-shell.addEventListener("submit", (e) => {
+/* ================= 追加シート ================= */
+let okTimer: ReturnType<typeof setTimeout> | undefined;
+function openAdder() {
+  if (gate) return;
+  if (!adderDlg.firstElementChild) adderDlg.innerHTML = adderHTML();
+  if (!adderDlg.open) adderDlg.showModal();
+  fill();
+  (addForm()?.elements.namedItem("t") as HTMLInputElement | null)?.focus();
+}
+function closeAdder() { if (adderDlg.open) adderDlg.close(); }
+adderDlg.addEventListener("close", () => {
+  voiceAdd.abort();
+  clearTimeout(okTimer);
+  const ok = adderDlg.querySelector<HTMLElement>(".okmsg");
+  if (ok) ok.textContent = "";
+  if (!gate) fabEl.focus();
+});
+fabEl.addEventListener("click", openAdder);
+
+adderDlg.addEventListener("submit", (e) => {
   const f = (e.target as HTMLElement).closest<HTMLFormElement>('form[data-form="add"]');
   if (!f) return;
   e.preventDefault();
@@ -481,14 +494,34 @@ shell.addEventListener("submit", (e) => {
     const t = store.add({ title: v.value, due: dv.value, label });
     if (label) { fx.set(t.id, { kind: "lbl", until: Date.now() + 900 }); scheduleFxCleanup(); fill(); }
     ti.value = ""; di.value = ""; err.hidden = true;
+    // 連続で追加できるよう、シートは開いたまま。短い表示だけ出す
+    const ok = adderDlg.querySelector<HTMLElement>(".okmsg");
+    if (ok) { ok.textContent = "追加しました"; clearTimeout(okTimer); okTimer = setTimeout(() => { ok.textContent = ""; }, 1200); }
+    ti.focus();
     toast("追加しました", { label: "メモを書く", action: () => openEditor(t.id, { note: true }), ms: 3500 });
   } catch (ex) {
     err.textContent = (ex as Error).message; err.hidden = false;
   }
 });
-shell.addEventListener("input", (e) => {
+adderDlg.addEventListener("input", (e) => {
   const f = (e.target as HTMLElement).closest('form[data-form="add"]');
   if (f) (f.querySelector(".ferr") as HTMLElement).hidden = true;
+});
+adderDlg.addEventListener("keydown", (e) => {
+  if (e.key !== "Tab") return;
+  const f = [...adderDlg.querySelectorAll<HTMLElement>("button, input, [tabindex]:not([tabindex='-1'])")].filter((x) => !x.hasAttribute("disabled") && !x.hidden && x.offsetParent !== null);
+  if (!f.length) return;
+  const first = f[0], last = f[f.length - 1], cur = document.activeElement;
+  if (!adderDlg.contains(cur)) { e.preventDefault(); first.focus(); }
+  else if (e.shiftKey && cur === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && cur === last) { e.preventDefault(); first.focus(); }
+});
+adderDlg.addEventListener("click", (e) => {
+  const tg = e.target as HTMLElement;
+  if (tg === adderDlg || tg.closest("[data-close]")) { closeAdder(); return; } // 暗幕・×で閉じる
+  const lb = tg.closest<HTMLButtonElement>("[data-lbl]");
+  if (lb) { if (lb.disabled) return; const k = lb.dataset.lbl as Label; addLabel = addLabel === k ? "" : k; fill(); return; }
+  if (tg.closest('[data-mic="add"]')) voiceAdd.toggle();
 });
 
 shell.addEventListener("click", (e) => {
@@ -500,10 +533,7 @@ shell.addEventListener("click", (e) => {
   if (tg.closest('[data-act="stamp"]')) { openDrawer(); return; }
   const flt = tg.closest<HTMLElement>("[data-flt]");
   if (flt) { setFilter(normalizeFilter(flt.dataset.flt)); return; }
-  const lb = tg.closest<HTMLButtonElement>("[data-lbl]");
-  if (lb) { if (lb.disabled) return; const k = lb.dataset.lbl as Label; addLabel = addLabel === k ? "" : k; fill(); return; }
-  const mic = tg.closest<HTMLElement>('[data-mic="add"]');
-  if (mic) { voiceAdd.toggle(); return; }
+  if (tg.closest("[data-add-open]")) { openAdder(); return; }
   const ed = tg.closest<HTMLElement>("[data-edit]");
   if (ed) { openEditor(ed.dataset.edit!); return; }
   const body = tg.closest<HTMLElement>("[data-open]");
@@ -516,7 +546,7 @@ shell.addEventListener("click", (e) => {
 
 /* ================= 音声入力 ================= */
 function setMicState(kind: "add" | "note", on: boolean) {
-  const root = kind === "add" ? shell : editorDlg;
+  const root = kind === "add" ? adderDlg : editorDlg;
   root.querySelectorAll<HTMLElement>(`[data-mic="${kind}"]`).forEach((b) => {
     b.classList.toggle("on", on);
     b.setAttribute("aria-pressed", String(on));

@@ -146,7 +146,7 @@ a { color: var(--a1); text-underline-offset: 2px; word-break: break-all }
 .toast .tact:hover { background: color-mix(in srgb, var(--bg) 30%, transparent) }
 
 /* ===== PC (幅 900px 以上) ===== */
-.pc-in { max-width: 1160px; margin: 0 auto; padding: 40px 32px 64px }
+.pc-in { max-width: 1160px; margin: 0 auto; padding: 40px 32px 120px }
 .la .pc-in { display: grid; gap: 18px; max-width: 980px }
 .la .hello { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap }
 .la .hello small, .lc .hero small, .ph-head small { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--a1); font-weight: 700 }
@@ -155,10 +155,8 @@ a { color: var(--a1); text-underline-offset: 2px; word-break: break-all }
 .la .list { display: grid; gap: 10px }
 .la .list .item { background: var(--glass); border: 1px solid var(--border); border-radius: 18px; padding: 14px 16px; box-shadow: 0 1px 2px rgb(30 20 60/.04) }
 .la .list .item.done { background: color-mix(in srgb, var(--glass) 70%, var(--surface2)) }
-.la .addbox { background: var(--glass); border: 1px solid var(--border); border-radius: 20px; padding: 12px }
-.t:not(.wpon).la .addbox { background: transparent; border: 0; padding: 0 }
 
-.lc .pc-in { padding: 32px 24px 64px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; align-items: start }
+.lc .pc-in { padding: 32px 24px 120px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; align-items: start }
 .lc .hero { grid-column: 1 / span 3; background: linear-gradient(140deg, color-mix(in srgb, var(--a1) 16%, var(--glass)), color-mix(in srgb, var(--a2) 16%, var(--glass))) }
 .lc .hero h1 { font-size: 28px; font-weight: 700; margin: 4px 0 0 }
 .lc .hero .big { font-size: 52px }
@@ -175,7 +173,7 @@ a { color: var(--a1); text-underline-offset: 2px; word-break: break-all }
 
 /* ===== スマホ (幅 900px 未満) ===== */
 .ph { min-height: 100vh; min-height: 100dvh }
-.ph-body { padding: calc(env(safe-area-inset-top) + 10px) calc(env(safe-area-inset-right) + 16px) calc(var(--foot-h, 150px) + 16px) calc(env(safe-area-inset-left) + 16px); display: grid; gap: 12px; align-content: start; max-width: 640px; margin: 0 auto }
+.ph-body { padding: calc(env(safe-area-inset-top) + 10px) calc(env(safe-area-inset-right) + 16px) calc(env(safe-area-inset-bottom) + 104px) calc(env(safe-area-inset-left) + 16px); display: grid; gap: 12px; align-content: start; max-width: 640px; margin: 0 auto }
 .ph-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px 8px; padding: 4px 2px }
 .ph-head h1 { font-size: 19px; white-space: nowrap }
 .ph-head .appicon { width: 36px; height: 36px; border-radius: 10px }
@@ -191,11 +189,6 @@ a { color: var(--a1); text-underline-offset: 2px; word-break: break-all }
 .la .ph-body .item.done { background: color-mix(in srgb, var(--glass) 70%, var(--surface2)) }
 .lc .ph-body .list { background: var(--glass); border: 1px solid var(--border); border-radius: 20px; padding: 4px 12px }
 .lc .ph-body .item { padding: 12px 0; --ss: 42px; --sr: 4px }
-.ph-foot { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; padding: 12px calc(env(safe-area-inset-right) + 14px) calc(env(safe-area-inset-bottom) + 14px) calc(env(safe-area-inset-left) + 14px); border-top: 1px solid var(--border); background: var(--glass) }
-.t:not(.wpon) .ph-foot { background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px) }
-.ph-foot .add { max-width: 640px; margin: 0 auto }
-.ph-foot .tin { flex-basis: 100% }
-.ph-foot .dwrap { flex: 1 }
 .ph .mode-note { text-align: center }
 
 /* ===== wallpapers (theme-aware) ===== */
@@ -358,8 +351,6 @@ dialog.ask .sheet-body p { margin: 0; font-size: 14px }
 .lpill:focus-visible { outline: 3px solid var(--soft); outline-offset: 2px }
 .lblpick { display: inline-flex; gap: 6px; flex-wrap: wrap }
 .ftabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px }
-.ph-foot .lblpick { order: 3; flex-basis: 100% }
-.ph-foot .add .btn { order: 2 }
 @media (max-width: 420px) { .lpill { padding: 0 11px } }
 
 /* ===== 進捗の細い1行(一覧の上) ===== */
@@ -396,3 +387,27 @@ dialog.ask .sheet-body p { margin: 0; font-size: 14px }
 .dr-n { font-size: 14px; color: var(--muted); font-weight: 700 }
 .dr-n b { font: 700 32px/1 "Manrope", sans-serif; color: var(--a1); margin-right: 4px; font-variant-numeric: tabular-nums }
 @media (prefers-reduced-motion: reduce) { .drawer, .scrim { transition: none !important } }
+
+/* ===== 追加ボタン(FAB)と追加シート ===== */
+.fab { position: fixed; z-index: 20; right: calc(env(safe-area-inset-right) + 16px); bottom: calc(env(safe-area-inset-bottom) + 16px); width: 56px; height: 56px; border: 0; border-radius: 50%; background: var(--grad); color: var(--on); display: grid; place-items: center; cursor: pointer; box-shadow: 0 14px 28px -8px var(--a1), 0 4px 12px rgb(10 20 40/.22); transition: transform .24s var(--ease), box-shadow .24s var(--ease) }
+.fab svg { width: 26px; height: 26px }
+.fab:hover { transform: translateY(-2px) scale(1.04) }
+.fab:active { transform: scale(.96) }
+.fab:focus-visible { outline: 3px solid var(--a1); outline-offset: 3px }
+@media (min-width: 900px) {
+  .fab { bottom: 32px; right: max(24px, calc((100vw - 980px) / 2 + 8px)) }
+  .lc .fab { right: max(24px, calc((100vw - 1160px) / 2 + 24px)) }
+}
+.adder .add { gap: 10px }
+.adder .tin { flex-basis: 100% }
+.adder .dwrap { flex: 1 }
+.adder .lblpick { order: 3; flex-basis: 100% }
+.adder .add .btn { order: 2 }
+.adder .vstat { position: static; flex: 0 0 auto }
+.adder .sheet-head h2 { font-size: 18px }
+.okmsg { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--a1); background: var(--soft); border-radius: 999px; padding: 4px 12px; animation: okin .24s var(--ease) both }
+.okmsg:empty { display: none }
+@keyframes okin { from { opacity: 0; transform: translateY(4px) } }
+.addcta { display: inline-flex; align-items: center; justify-content: center; margin-top: 14px; height: 44px; padding: 0 22px; border: 0; border-radius: 999px; background: var(--grad); color: var(--on); font-weight: 700; cursor: pointer; box-shadow: 0 6px 16px -6px var(--a1) }
+.addcta:focus-visible { outline: 3px solid var(--a1); outline-offset: 2px }
+.adder .iconbtn.x { width: 44px; height: 44px }

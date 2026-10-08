@@ -1,5 +1,5 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
-import { addTask, item } from "./helpers";
+import { addTask, item, openAdder } from "./helpers";
 
 // Firebase Emulator(demo-someday)を使った同期とログインの壁のテスト。本番の Firebase には接続しない。
 const PROJECT = "demo-someday";
@@ -70,7 +70,8 @@ test("許可アカウントでログインすると、アプリ画面が出る",
   await expect(page.locator('[data-testid="gate"] [data-act="login"]')).toBeVisible({ timeout: 20_000 });
   await signIn(page, `allowed-${Date.now()}`);
   await expect(page.getByTestId("gate")).toHaveCount(0);
-  await expect(page.locator('form[data-form="add"]')).toBeVisible();
+  await expect(page.locator("#fab")).toBeVisible();
+  await expect(page.locator('form[data-form="add"]')).toBeHidden(); // 追加フォームは「＋」を押すまで隠れている
   await expect(page.locator(".empty")).toBeVisible();
   await addTask(page, "許可アカウントのやること");
   await expect(item(page, "許可アカウントのやること")).toBeVisible();
@@ -214,6 +215,7 @@ test("ラベル(仕事/プライベート)が、別アカウントのブラウ�
   const a = await open(browser, `lbl3-${Date.now()}`, ALLOWED);
   const b = await open(browser, `lbl7-${Date.now()}`, ALLOWED2);
   // A: 仕事ラベルを付けて追加 → B にチップつきで届く
+  await openAdder(a);
   await a.locator('.lblpick [data-lbl="work"]').click();
   await addTask(a, "企画書を出す");
   await expect(item(b, "企画書").locator(".lchip")).toHaveText("仕事", { timeout: 15_000 });
