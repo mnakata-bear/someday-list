@@ -1,0 +1,59 @@
+rules_version = '2';
+
+// いつかやることリスト
+//   users/{uid}/tasks/{taskId}   タスク
+//   users/{uid}/meta/settings    見た目の設定
+//   users/{uid}/meta/stats       スタンプの累計
+// ログインした本人(request.auth.uid == userId)だけが読み書きできる。それ以外はすべて拒否。
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /users/{userId} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      function validTask(d) {
+        return d.keys().hasOnly(['title', 'due', 'note', 'done', 'doneAt', 'createdAt', 'updatedAt'])
+          && d.keys().hasAll(['title', 'due', 'done', 'createdAt', 'updatedAt'])
+          && d.title is string && d.title.size() >= 1 && d.title.size() <= 100
+          && d.due is string && (d.due == '' || d.due.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'))
+          && (!('note' in d) || (d.note is string && d.note.size() <= 2000))
+          && d.done is bool
+          && (!('doneAt' in d) || d.doneAt == null || d.doneAt is int)
+          && d.createdAt is int
+          && d.updatedAt is int;
+      }
+
+      match /tasks/{taskId} {
+        allow read, delete: if isOwner();
+        allow create, update: if isOwner() && taskId.size() <= 64 && validTask(request.resource.data);
+      }
+
+      match /meta/settings {
+        allow read: if isOwner();
+        allow create, update: if isOwner()
+          && request.resource.data.keys().hasOnly(['layout', 'theme', 'wp', 'stamp'])
+          && request.resource.data.layout in ['a', 'c']
+          && request.resource.data.theme is string && request.resource.data.theme.size() <= 32
+          && request.resource.data.wp is string && request.resource.data.wp.size() <= 32
+          && request.resource.data.stamp in ['sumi', 'kanryo', 'done', 'good'];
+        allow delete: if isOwner();
+      }
+
+      match /meta/stats {
+        allow read: if isOwner();
+        allow create, update: if isOwner()
+          && request.resource.data.keys().hasOnly(['stampTotal'])
+          && request.resource.data.stampTotal is int
+          && request.resource.data.stampTotal >= 0;
+        allow delete: if isOwner();
+      }
+    }
+
+    // ここに書かれていない場所は、すべて拒否
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

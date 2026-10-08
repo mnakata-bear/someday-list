@@ -1,0 +1,12 @@
+node_modules/
+dist/
+dev-dist/
+test-results/
+playwright-report/
+*.log
+.env.local
+.env.*.local
+.firebase/
+firestore-debug.log
+dist-e2e/
+dist-emu/

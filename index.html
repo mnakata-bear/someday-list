@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>いつかやることリスト</title>
+<meta name="description" content="期限はあってもなくてもいい、「いつかやりたいこと」を書きためるリスト。スマホとパソコンで同期できます。">
+<meta name="theme-color" content="#f2f8fe">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="いつかやること">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Manrope:wght@400;500;700&family=M+PLUS+1p:wght@400;500;700&family=Shippori+Mincho:wght@700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+</head>
+<body>
+<div id="app" class="t">
+  <div class="bgwall" aria-hidden="true"></div>
+  <div id="shell"><div class="loading" style="min-height:60vh"><span class="spin"></span>読み込み中…</div></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"><span class="tmsg"></span><button type="button" class="tact" hidden></button></div>
+  <dialog id="settings" class="sheet" aria-labelledby="st-h"></dialog>
+  <dialog id="editor" class="sheet" aria-labelledby="ed-h"></dialog>
+  <dialog id="ask" class="sheet ask" aria-labelledby="ask-h"></dialog>
+  <input type="file" id="photo" accept="image/*" hidden>
+</div>
+<noscript>このアプリを使うには JavaScript を有効にしてください。</noscript>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>
