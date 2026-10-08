@@ -3,7 +3,7 @@ import { addTask, item } from "./helpers";
 
 // Firebase Emulator(demo-someday)を使った同期とログインの壁のテスト。本番の Firebase には接続しない。
 const PROJECT = "demo-someday";
-const ALLOWED = "bears.sys.apps@gmail.com";
+const ALLOWED = "naka.mutora3@gmail.com";
 
 /** エミュレーターのアカウント / Firestore を空にする(テスト同士が干渉しないように) */
 async function clearAuth() {

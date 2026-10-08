@@ -11,7 +11,7 @@ service cloud.firestore {
     // このアプリを使えるアカウント(Google のメール)。増やすときはこのリストに足す。
     // クライアント側の同じリストは src/core/access.ts(見た目用。守りの本体はここ)
     function allowedEmail() {
-      return request.auth.token.email in ['bears.sys.apps@gmail.com'];
+      return request.auth.token.email in ['naka.mutora3@gmail.com'];
     }
 
     match /users/{userId} {

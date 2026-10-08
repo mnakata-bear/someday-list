@@ -17,7 +17,7 @@ afterAll(async () => { await env?.cleanup(); });
 beforeEach(async () => { await env.clearFirestore(); });
 
 // 許可されたメール(alice / bob とも同じメールで uid だけ違う)
-const ALLOWED = { email: "bears.sys.apps@gmail.com", email_verified: true };
+const ALLOWED = { email: "naka.mutora3@gmail.com", email_verified: true };
 const alice = () => env.authenticatedContext("alice", ALLOWED).firestore();
 const bob = () => env.authenticatedContext("bob", ALLOWED).firestore();
 const anon = () => env.unauthenticatedContext().firestore();
@@ -69,7 +69,7 @@ describe("許可されたメールだけが使える", () => {
   });
   it("email_verified が false なら、許可メールでも読み書きできない", async () => {
     await env.withSecurityRulesDisabled(async (c) => { await setDoc(doc(c.firestore(), "users/alice/tasks/t1"), task()); });
-    const db = env.authenticatedContext("alice", { email: "bears.sys.apps@gmail.com", email_verified: false }).firestore();
+    const db = env.authenticatedContext("alice", { email: "naka.mutora3@gmail.com", email_verified: false }).firestore();
     await assertFails(getDoc(doc(db, "users/alice/tasks/t1")));
     await assertFails(setDoc(doc(db, "users/alice/tasks/t2"), task()));
     await assertFails(deleteDoc(doc(db, "users/alice/tasks/t1")));
