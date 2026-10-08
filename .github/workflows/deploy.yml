@@ -59,6 +59,20 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+      actions: write
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+      # 公開用ファイル一式(中にアプリの置き場所 app-<slug>/ がある)を、公開が終わったらすぐ消す。
+      # public リポジトリでは、この一式を誰でもダウンロードできてしまうため
+      - name: 公開用の一式を削除
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for id in $(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts" --jq '.artifacts[].id'); do
+            gh api -X DELETE "repos/${{ github.repository }}/actions/artifacts/$id" || true
+          done

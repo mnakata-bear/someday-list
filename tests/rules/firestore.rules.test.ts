@@ -17,8 +17,9 @@ afterAll(async () => { await env?.cleanup(); });
 beforeEach(async () => { await env.clearFirestore(); });
 
 // 許可された 2 アカウント(uid もメールも別)
-const ALLOWED = { email: "naka.mutora3@gmail.com", email_verified: true };
-const ALLOWED2 = { email: "naka.mutora7@gmail.com", email_verified: true };
+const GOOGLE = { sign_in_provider: "google.com" };
+const ALLOWED = { email: "naka.mutora3@gmail.com", email_verified: true, firebase: GOOGLE };
+const ALLOWED2 = { email: "naka.mutora7@gmail.com", email_verified: true, firebase: GOOGLE };
 const alice = () => env.authenticatedContext("alice", ALLOWED).firestore();
 const bob = () => env.authenticatedContext("bob", ALLOWED2).firestore();
 const anon = () => env.unauthenticatedContext().firestore();
@@ -176,5 +177,15 @@ describe("フィールドの検証", () => {
     await assertSucceeds(setDoc(s, { stampTotal: increment(-1) }, { merge: true }));
     await assertFails(setDoc(s, { stampTotal: increment(-1) }, { merge: true })); // 0 未満
     await assertFails(setDoc(s, { stampTotal: 1.5 }));
+  });
+});
+
+describe("Google 以外のサインイン方法", () => {
+  it("許可メールでも、匿名やメール/パスワードのログインは拒否される", async () => {
+    for (const provider of ["anonymous", "password", "custom"]) {
+      const db = env.authenticatedContext("dave", { email: "naka.mutora3@gmail.com", email_verified: true, firebase: { sign_in_provider: provider } }).firestore();
+      await assertFails(getDoc(doc(db, "spaces/home/tasks/t1")));
+      await assertFails(setDoc(doc(db, "spaces/home/tasks/t1"), task()));
+    }
   });
 });
