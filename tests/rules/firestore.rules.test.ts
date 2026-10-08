@@ -119,3 +119,12 @@ describe("フィールドの検証", () => {
     await assertFails(setDoc(s, { stampTotal: 1.5 }));
   });
 });
+
+describe("2つ目の許可アカウント", () => {
+  it("naka.mutora7 も自分のデータを読み書きできる", async () => {
+    const db = env.authenticatedContext("carol", { email: "naka.mutora7@gmail.com", email_verified: true }).firestore();
+    const ref = doc(db, "users/carol/tasks/t1");
+    await assertSucceeds(setDoc(ref, task()));
+    await assertSucceeds(getDoc(ref));
+  });
+});
