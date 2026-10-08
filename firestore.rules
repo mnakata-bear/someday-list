@@ -1,10 +1,12 @@
 rules_version = '2';
 
-// いつかやることリスト
-//   users/{uid}/tasks/{taskId}   タスク
-//   users/{uid}/meta/settings    見た目の設定
-//   users/{uid}/meta/stats       スタンプの累計
-// 許可リストのメール(確認済み)でログインした本人(request.auth.uid == userId)だけが読み書きできる。それ以外はすべて拒否。
+// いつかやることリスト(許可された 2 アカウントで、1 つのリストを共有する)
+//   spaces/home/tasks/{taskId}   タスク
+//   spaces/home/meta/settings    見た目の設定
+//   spaces/home/meta/stats       スタンプの累計
+// 許可リストのメール(確認済み)でログインしていれば、どのアカウントでも spaces/home を読み書きできる(uid は問わない)。
+// 旧データ users/{uid}/... は、共有スペースへの移行用に「本人の read と delete」だけ残す(書き込みは不可)。
+// それ以外はすべて拒否。
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -14,14 +16,13 @@ service cloud.firestore {
       return request.auth.token.email in ['naka.mutora3@gmail.com', 'naka.mutora7@gmail.com'];
     }
 
-    match /users/{userId} {
-      function isOwner() {
-        return request.auth != null
-          && request.auth.uid == userId
-          && request.auth.token.email_verified == true
-          && allowedEmail();
-      }
+    function isMember() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && allowedEmail();
+    }
 
+    match /spaces/home {
       function validTask(d) {
         return d.keys().hasOnly(['title', 'due', 'note', 'done', 'doneAt', 'createdAt', 'updatedAt'])
           && d.keys().hasAll(['title', 'due', 'done', 'createdAt', 'updatedAt'])
@@ -35,29 +36,34 @@ service cloud.firestore {
       }
 
       match /tasks/{taskId} {
-        allow read, delete: if isOwner();
-        allow create, update: if isOwner() && taskId.size() <= 64 && validTask(request.resource.data);
+        allow read, delete: if isMember();
+        allow create, update: if isMember() && taskId.size() <= 64 && validTask(request.resource.data);
       }
 
       match /meta/settings {
-        allow read: if isOwner();
-        allow create, update: if isOwner()
+        allow read: if isMember();
+        allow create, update: if isMember()
           && request.resource.data.keys().hasOnly(['layout', 'theme', 'wp', 'stamp'])
           && request.resource.data.layout in ['a', 'c']
           && request.resource.data.theme is string && request.resource.data.theme.size() <= 32
           && request.resource.data.wp is string && request.resource.data.wp.size() <= 32
           && request.resource.data.stamp in ['sumi', 'kanryo', 'done', 'good'];
-        allow delete: if isOwner();
+        allow delete: if isMember();
       }
 
       match /meta/stats {
-        allow read: if isOwner();
-        allow create, update: if isOwner()
+        allow read: if isMember();
+        allow create, update: if isMember()
           && request.resource.data.keys().hasOnly(['stampTotal'])
           && request.resource.data.stampTotal is int
           && request.resource.data.stampTotal >= 0;
-        allow delete: if isOwner();
+        allow delete: if isMember();
       }
+    }
+
+    // 旧データ(1 アカウント 1 リスト時代)。移行のため、本人が読んで消すことだけできる
+    match /users/{userId}/{document=**} {
+      allow read, delete: if isMember() && request.auth.uid == userId;
     }
 
     // ここに書かれていない場所は、すべて拒否

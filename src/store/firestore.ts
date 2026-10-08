@@ -7,11 +7,14 @@ import { applyStampDelta, diffTasks, normalizeSettings } from "../core/logic";
 import type { ErrorSink, Store, StoreState } from "./types";
 import { buildTask, cleanPatch } from "./local";
 
+/** 共有スペースの場所(2 アカウントで共有する 1 つのリスト) */
+export const SPACE = "spaces/home";
+
 /**
- * Cloud Firestore に保存するストア。
- *   users/{uid}/tasks/{taskId}  … タスク
- *   users/{uid}/meta/settings   … 見た目の設定
- *   users/{uid}/meta/stats      … スタンプの累計
+ * Cloud Firestore に保存するストア。許可された 2 アカウントが同じ共有スペースを使う。
+ *   spaces/home/tasks/{taskId}  … タスク
+ *   spaces/home/meta/settings   … 見た目の設定
+ *   spaces/home/meta/stats      … スタンプの累計
  * オフライン中の書き込みは端末内のキャッシュ(persistentLocalCache)に入り、復帰時に送られる。
  * そのため書き込みの Promise は待たずに、onSnapshot の結果で画面を更新する。
  */
@@ -27,7 +30,7 @@ export class FirestoreStore implements Store {
   private unsubs: (() => void)[] = [];
   private readyTimer: ReturnType<typeof setTimeout> | undefined;
 
-  constructor(private db: Firestore, private uid: string, private onError: ErrorSink, private now: () => number = Date.now) {
+  constructor(private db: Firestore, private onError: ErrorSink, private now: () => number = Date.now) {
     const tasksCol = this.tasksCol();
     this.unsubs.push(onSnapshot(tasksCol, { includeMetadataChanges: true }, (snap) => {
       const next = snap.docs.map(toTask);
@@ -58,10 +61,10 @@ export class FirestoreStore implements Store {
     }, (err) => this.onError("スタンプの読み込みに失敗しました", err)));
   }
 
-  private tasksCol() { return collection(this.db, "users", this.uid, "tasks"); }
-  private taskRef(id: string) { return doc(this.db, "users", this.uid, "tasks", id); }
-  private statsRef() { return doc(this.db, "users", this.uid, "meta", "stats"); }
-  private settingsRef() { return doc(this.db, "users", this.uid, "meta", "settings"); }
+  private tasksCol() { return collection(this.db, SPACE, "tasks"); }
+  private taskRef(id: string) { return doc(this.db, SPACE, "tasks", id); }
+  private statsRef() { return doc(this.db, SPACE, "meta", "stats"); }
+  private settingsRef() { return doc(this.db, SPACE, "meta", "settings"); }
 
   private emit(remote: StoreState["remote"]) {
     const s: StoreState = {
@@ -140,11 +143,11 @@ export class FirestoreStore implements Store {
   }
 }
 
-function toData(t: Task) {
+export function toData(t: Task) {
   return { title: t.title, due: t.due, note: t.note, done: t.done, doneAt: t.doneAt, createdAt: t.createdAt, updatedAt: t.updatedAt };
 }
 
-function toTask(d: QueryDocumentSnapshot<DocumentData>): Task {
+export function toTask(d: QueryDocumentSnapshot<DocumentData>): Task {
   const x = d.data();
   return {
     id: d.id,

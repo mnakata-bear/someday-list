@@ -22,9 +22,20 @@
 
 | もの | ログイン中 | 未ログイン / ローカルモード |
 |---|---|---|
-| やること・スタンプ累計 | Firestore `users/{uid}/tasks/{taskId}`、`users/{uid}/meta/stats` | この端末の localStorage |
-| 設定(テーマなど) | Firestore `users/{uid}/meta/settings`(端末にも控え) | この端末の localStorage |
+| やること・スタンプ累計 | Firestore 共有スペース `spaces/home/tasks/{taskId}`、`spaces/home/meta/stats` | この端末の localStorage |
+| 設定(テーマなど) | Firestore `spaces/home/meta/settings`(端末にも控え) | この端末の localStorage |
 | 自分の写真(壁紙) | **この端末の IndexedDB だけ**(クラウドには上げない) | 同じ |
+
+許可された 2 アカウントは **同じ 1 つのリスト(共有スペース `spaces/home`)** を使います。どちらでログインしても、同じタスク・スタンプ累計・見た目設定になります。もう一方のアカウントからの変更も「別の端末から〜」のトーストで知らせます。
+
+#### 以前のデータ(`users/{uid}/...`)からの移行
+
+以前は 1 アカウント 1 リスト(`users/{uid}/...`)でした。ログイン時(アプリを開いてログイン状態が確定したとき)に旧データがあれば、自動で共有スペースへ移します(`src/store/migrate.ts`、計画は `src/core/migration.ts`)。
+
+- タスク: 共有スペースに無い ID だけ追加(同じ ID が共有側にあれば、共有側を残して上書きしない)
+- スタンプ累計: 旧と共有の大きいほう / 設定: 共有側に無いときだけコピー
+- コピーと旧データの削除は同じバッチで行い、移したあとは旧データを消すので一度だけ動きます。サーバーから読めないとき(オフライン)はスキップし、次に開いたときにやり直します
+- **本番での移行・共有の動作は未検証です**(Emulator のテストでのみ確認)
 
 ### 音声入力について
 
@@ -84,7 +95,9 @@ npx -y firebase-tools@latest deploy --only firestore:rules --project itupo-app
 
 ### セキュリティルール(`firestore.rules`)
 
-- 許可リストのメール(`email_verified == true`)でログインし、`request.auth.uid == userId` の本人だけが `users/{userId}/...` を読み書きできる。それ以外はすべて拒否
+- 許可リストのメール(`email_verified == true`)でログインしていれば、どちらのアカウントでも共有スペース `spaces/home/...` を読み書きできる(uid は問わない)
+- 旧データ `users/{userId}/...` は移行用に、本人(uid 一致)かつ許可メールの **read と delete だけ**。書き込みは不可
+- それ以外はすべて拒否
 - タスク: `title` は 1〜100 字の文字列、`due` は `""` か `YYYY-MM-DD`、`note` は 2000 字以内の文字列、`done` は bool、日時は整数(ms)、余計なフィールドは不可
 - 設定: layout / theme / wp / stamp の4つだけ。スタンプ累計: 0 以上の整数
 
@@ -114,7 +127,7 @@ npm run dev:gate
 npm test
 ```
 
-単体テスト(Vitest): 期限表示、並び順、スタンプ累計、LocalStore の CRUD、設定保存、入力チェック、音声の期限読み取り、メモのリンク化。
+単体テスト(Vitest): 期限表示、並び順、スタンプ累計、LocalStore の CRUD、設定保存、入力チェック、音声の期限読み取り、メモのリンク化、旧データ移行の計画(重複 ID・累計・設定)。
 
 ```bash
 npx playwright install chromium
@@ -132,7 +145,7 @@ E2E(Playwright / ローカルモード): `test:e2e` はアプリの E2E と入�
 npm run test:emu
 ```
 
-Firebase Emulator(`demo-someday`。本番にはつながない)で、ルールのテスト(許可外メール・メール未確認の拒否を含む)と、ログイン画面(未ログイン / 許可アカウント / 許可外アカウント)、2つのブラウザ間のリアルタイム同期・他 uid の分離・オフライン→復帰・ログイン時の取り込みを確認します。Java が必要です。Windows では先に JAVA_HOME を設定してください(Git Bash の例):
+Firebase Emulator(`demo-someday`。本番にはつながない)で、ルールのテスト(2 アカウントが同じ `spaces/home` を読み書きできる、許可外メール・メール未確認・未ログインの拒否、旧 `users` は本人の read/delete のみで write 拒否)と、ログイン画面(未ログイン / 許可アカウント / 許可外アカウント)、別々の許可アカウントでログインした 2 つのブラウザ間のリアルタイム同期(同じリストの共有)・旧データ `users/{uid}` から共有スペースへの移行(共有側が空 / すでにある場合)・オフライン→復帰・ログイン時の取り込みを確認します。Java が必要です。Windows では先に JAVA_HOME を設定してください(Git Bash の例):
 
 ```bash
 export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr"
@@ -163,8 +176,8 @@ src/
   main.ts            画面の組み立て・イベント・設定パネル・編集シート
   styles.css         モックから移植したスタイル
   firebase-config.ts VITE_FIREBASE_* を読む(未設定ならローカルモード)
-  core/              純粋関数(themes / logic: 期限・並び順・スタンプ・入力チェック / spoken: 音声の期限読み取り / gate-slug: 合言葉→slug)
-  store/             ストレージ層(types: 共通インターフェース / local: LocalStore / firestore: FirestoreStore / cloud: 初期化とログイン)
+  core/              純粋関数(themes / logic: 期限・並び順・スタンプ・入力チェック / spoken: 音声の期限読み取り / gate-slug: 合言葉→slug / migration: 移行の計画)
+  store/             ストレージ層(types: 共通インターフェース / local: LocalStore / firestore: FirestoreStore(共有スペース) / migrate: 旧データの移行 / cloud: 初期化とログイン)
   ui/                icons / photo(IndexedDB) / voice(Web Speech API)
 scripts/             slug.mjs(合言葉→slug の Node 版) / build-pages.mjs(入口+アプリをまとめてビルド) / serve-pages.mjs(E2E 用の静的サーバー)
 public/icons/        PWA アイコン(scripts/make-icons.mjs で生成)

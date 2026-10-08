@@ -9,6 +9,7 @@ import { connectFirestoreEmulator, initializeFirestore, persistentLocalCache, pe
 import type { FirebaseWebConfig } from "../firebase-config";
 import { ALLOWED_EMAILS } from "../core/access";
 import { FirestoreStore } from "./firestore";
+import { migrateLegacy, type MigrationResult } from "./migrate";
 import type { ErrorSink } from "./types";
 
 export interface CloudUser { uid: string; name: string; email: string; emailVerified: boolean }
@@ -17,9 +18,14 @@ export interface Cloud {
   onUser(cb: (u: CloudUser | null) => void): () => void;
   signIn(): Promise<void>;
   signOut(): Promise<void>;
-  createStore(uid: string, onError: ErrorSink): FirestoreStore;
+  /** 共有スペース(spaces/home)のストア。どの許可アカウントでも同じリストになる */
+  createStore(onError: ErrorSink): FirestoreStore;
+  /** 旧データ users/{uid}/... があれば共有スペースへ移す(無ければ null) */
+  migrateLegacy(uid: string): Promise<MigrationResult | null>;
   /** エミュレーター専用: Google の偽トークンでログイン(E2E テスト用)。email の既定は許可アカウント */
   testSignIn?(sub: string, email?: string, emailVerified?: boolean): Promise<void>;
+  /** エミュレーター専用: いまログインしている uid(E2E テスト用) */
+  testUid?(): string | null;
 }
 
 export function initCloud(cfg: FirebaseWebConfig, emulator: boolean): Cloud {
@@ -59,13 +65,15 @@ export function initCloud(cfg: FirebaseWebConfig, emulator: boolean): Cloud {
       }
     },
     signOut: () => signOut(auth),
-    createStore: (uid, onError) => new FirestoreStore(db, uid, onError),
+    createStore: (onError) => new FirestoreStore(db, onError),
+    migrateLegacy: (uid) => migrateLegacy(db, uid),
   };
   if (emulator) {
     cloud.testSignIn = async (sub: string, email: string = ALLOWED_EMAILS[0], emailVerified = true) => {
       const cred = GoogleAuthProvider.credential(JSON.stringify({ sub, email, email_verified: emailVerified, name: sub }));
       await signInWithCredential(auth, cred);
     };
+    cloud.testUid = () => auth.currentUser?.uid ?? null;
   }
   return cloud;
 }

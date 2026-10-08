@@ -41,6 +41,10 @@ let settings: Settings = normalizeSettings(null);
   if (first) settings = first;
 }
 let cloud: Cloud | null = null;
+/** 旧データの移行中か(移行中はクラウドに設定が無くても今の設定をのせない。旧の設定を移すため) */
+let migrating = false;
+/** 移行中に「クラウドに設定が無い」と分かったか(移行後にのせる) */
+let settingsMissing = false;
 let user: CloudUser | null = null;
 let authResolved = !firebaseConfig;
 let photoURL = "";
@@ -342,13 +346,16 @@ function useStore(s: Store) {
   });
   unsubSettings = s.subscribeSettings((remote) => {
     if (remote) {
+      settingsMissing = false;
       if (JSON.stringify(remote) !== JSON.stringify(settings)) {
         settings = remote;
         if (s !== localStore) localStore.saveSettings(settings);
         applySettings(false);
       }
     } else if (s.kind === "cloud") {
-      s.saveSettings(settings); // クラウドにまだ無ければ、今の設定をのせる
+      // クラウドにまだ無ければ、今の設定をのせる(旧データの移行中は、移行が終わってから)
+      if (migrating) settingsMissing = true;
+      else s.saveSettings(settings);
     }
   });
 }
@@ -680,7 +687,7 @@ function dropCloudStore() {
 async function startCloud() {
   const { initCloud } = await import("./store/cloud");
   cloud = initCloud(firebaseConfig!, useEmulator);
-  if (cloud.testSignIn) (window as unknown as Record<string, unknown>).__someday = { testSignIn: cloud.testSignIn, signOut: cloud.signOut };
+  if (cloud.testSignIn) (window as unknown as Record<string, unknown>).__someday = { testSignIn: cloud.testSignIn, signOut: cloud.signOut, uid: cloud.testUid };
   cloud.onUser(async (u) => {
     if (u && !isAllowedAccount(u.email, u.emailVerified)) {
       // 許可されていないアカウント: すぐログアウトし、アプリ画面は描画しない(どれが許可かは出さない)
@@ -698,10 +705,20 @@ async function startCloud() {
     dropCloudStore();
     if (u) {
       gateMsg = "";
-      const fs = cloud!.createStore(u.uid, onStoreError) as FirestoreStore;
+      const fs = cloud!.createStore(onStoreError) as FirestoreStore;
       const local = localStore.snapshot();
+      migrating = true; settingsMissing = false;
       useStore(fs);
       setGate(null);
+      // 以前の「アカウントごとのリスト」が残っていれば、共有リストへ移す(移したら旧データは消すので一度だけ)
+      cloud!.migrateLegacy(u.uid).then((r) => {
+        if (r && r.moved > 0 && store === fs) toast(`以前のリストから ${r.moved} 件を移しました`);
+      }).catch((ex) => console.warn("以前のリストを移せませんでした(次に開いたときにやり直します)", ex))
+        .finally(() => {
+          if (store !== fs) return;
+          migrating = false;
+          if (settingsMissing) { settingsMissing = false; fs.saveSettings(settings); }
+        });
       if (local.tasks.length) {
         const ok = await ask("この端末のやることを取り込みますか？", `ログイン前にこの端末で書いた ${local.tasks.length} 件があります。アカウントに取り込んで、ほかの端末と同期しますか？`, "取り込む", "今はしない");
         if (ok) { fs.importTasks(local.tasks, local.stampTotal); localStore.clearTasks(); toast(`${local.tasks.length} 件を取り込みました`); }
