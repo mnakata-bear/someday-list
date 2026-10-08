@@ -42,19 +42,23 @@ describe("並べ替え", () => {
 });
 
 describe("buildView", () => {
-  it("10件まで、超えたら more", () => {
+  it("既定は5件まで、超えたら more", () => {
     const ts = Array.from({ length: 13 }, (_, i) => mk("t" + i, "", { createdAt: i }));
     const v = buildView(ts, NOW);
-    expect(v.items).toHaveLength(10);
-    expect(v.more).toBe(3);
+    expect(v.items).toHaveLength(5);
+    expect(v.more).toBe(8);
     expect(v.total).toBe(13);
   });
-  it("ちょうど10件なら more は 0", () => {
-    expect(buildView(Array.from({ length: 10 }, (_, i) => mk("t" + i, "")), NOW).more).toBe(0);
+  it("ちょうど5件なら more は 0", () => {
+    expect(buildView(Array.from({ length: 5 }, (_, i) => mk("t" + i, "")), NOW).more).toBe(0);
   });
   it("件数のまとめ(期限切れ/もうすぐ)は表示件数に関係なく全体で数える", () => {
     const ts = [mk("o", "2026-10-01"), mk("t", "2026-10-09"), mk("s", "2026-10-20"), mk("f", "2027-01-01"), mk("n", "")];
     expect(buildView(ts, NOW, 2)).toMatchObject({ overdue: 1, soon: 2, total: 5, timeLabel: "10:00" });
+  });
+  it("挨拶は時間帯で変わる(JST)", () => {
+    expect(buildView([], NOW).greeting).toBe("おはよう！");
+    expect(buildView([], new Date("2026-10-09T03:00:00Z")).greeting).toBe("こんにちは！");
   });
   it("0件", () => expect(buildView([], NOW)).toMatchObject({ total: 0, more: 0, items: [] }));
   it("ラベル・メモ・期限切れの色", () => {
@@ -63,12 +67,12 @@ describe("buildView", () => {
     expect(v.items[1]).toMatchObject({ label: "プライベート", hasNote: false });
     expect(v.items[2].label).toBe("");
   });
-  it("デモは期限切れ/今日/期限なし/ラベル/メモが混在し 10件超", () => {
-    const v = buildView(demoTasks(NOW), NOW);
+  it("デモは期限切れ/今日/期限なし/ラベル/メモが混在し 5件超", () => {
+    const v = buildView(demoTasks(NOW), NOW, 99);
     const cls = new Set(v.items.map((i) => i.dueCls));
     expect(cls.has("over") && cls.has("soon") && cls.has("none")).toBe(true);
     expect(v.items.some((i) => i.hasNote)).toBe(true);
     expect(v.items.some((i) => i.label === "仕事") && v.items.some((i) => i.label === "プライベート")).toBe(true);
-    expect(v.total).toBeGreaterThan(10);
+    expect(v.total).toBeGreaterThan(5);
   });
 });

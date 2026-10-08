@@ -1,7 +1,7 @@
 // 通知ウィンドウに出す内容の計算(JST基準)。src/core/logic.ts の dueInfo と同じ規則。
 export const W = ["日", "月", "火", "水", "木", "金", "土"];
 export const LABELS = { work: "仕事", private: "プライベート" };
-export const MAX_ITEMS = 10;
+export const MAX_ITEMS = 5;
 const DAY = 864e5;
 
 /** 日時を JST の { y, m, d, dow, ymd } にする */
@@ -63,6 +63,7 @@ export function buildView(tasks, now = new Date(), max = MAX_ITEMS) {
   });
   return {
     kind: "list",
+    greeting: jstDate(now).hh < 11 ? "おはよう！" : "こんにちは！",
     dateLabel: dateLabel(now),
     timeLabel: (() => { const t = jstDate(now); return `${String(t.hh).padStart(2, "0")}:${String(t.mm).padStart(2, "0")}`; })(),
     overdue: sorted.filter((t) => dueInfo(t.due || "", now).cls === "over").length,

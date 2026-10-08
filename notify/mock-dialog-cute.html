@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>朝10時ダイアログ かわいい案</title>
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800&family=Manrope:wght@500;700&family=Klee+One:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--page:#f6f5f8;--ink:#1f2330;--muted:#6a6f7d;--line:#e4e2ea;--card:#fff;--chip:#eceef3;--ease:cubic-bezier(.2,.8,.2,1)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--page:#111318;--ink:#eceef3;--muted:#9aa0ad;--line:#2a2e38;--card:#181b22;--chip:#22262f}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font-family:"M PLUS Rounded 1c","Manrope",sans-serif;line-height:1.7;letter-spacing:.03em;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1100px;margin:0 auto;padding:40px 16px 80px}
+.eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:700;font-family:"Manrope"}
+h1{margin:6px 0 6px;font-size:clamp(24px,4vw,34px);line-height:1.3;font-feature-settings:"palt"}
+.lead{margin:0 0 20px;color:var(--muted);font-size:14px;max-width:44em}
+.tabs{display:flex;gap:6px;padding:5px;background:var(--chip);border-radius:999px;flex-wrap:wrap;margin-bottom:18px;width:fit-content;max-width:100%}
+.tabs button{border:0;background:transparent;padding:8px 16px;border-radius:999px;cursor:pointer;font-weight:700;font-size:13px;font-family:inherit;color:var(--muted);transition:all .18s var(--ease)}
+.tabs button[aria-selected="true"]{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgb(20 20 40/.08),0 4px 12px rgb(20 20 40/.08)}
+.tabs button:focus-visible{outline:3px solid #8b8fe0;outline-offset:2px}
+.info{display:grid;grid-template-columns:auto 1fr auto;gap:4px 16px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:14px 20px;margin-bottom:18px}
+.info b{font-size:17px}.info p{margin:0;font-size:13px;color:var(--muted)}
+.info .for{font-size:12px;padding:5px 12px;border-radius:999px;background:var(--chip);color:var(--muted);white-space:nowrap}
+.info .L{width:40px;height:40px;border-radius:14px}
+@media(max-width:700px){.info{grid-template-columns:auto 1fr}.info .for{grid-column:1/-1;justify-self:start}}
+.desk{position:relative;border-radius:22px;overflow:hidden;min-height:700px;display:grid;place-items:center;padding:24px 24px 64px;background:linear-gradient(135deg,#b9c8ea,#e4d9f0 50%,#f3d5de)}
+.desk::before{content:"";position:absolute;inset:0;background:rgb(30 25 50/.24)}
+.bar{position:absolute;left:0;right:0;bottom:0;height:40px;background:rgb(255 255 255/.55);backdrop-filter:blur(12px);display:flex;justify-content:flex-end;align-items:center;padding:0 14px;font:700 12px "Manrope";color:#33405c}
+.cap{margin-top:12px;font-size:12px;color:var(--muted)}
+#host{position:relative;z-index:2;animation:rise .45s var(--ease);justify-self:center;width:100%;display:flex;justify-content:center}
+@keyframes rise{from{opacity:0;transform:translateY(18px) scale(.97)}}
+button{font-family:inherit}
+.x{border:0;cursor:pointer;width:34px;height:34px;border-radius:50%;font-size:14px;background:rgb(0 0 0/.06);color:inherit}
+.btn{height:48px;border:0;border-radius:999px;font-weight:800;font-size:14px;cursor:pointer;transition:transform .15s var(--ease)}
+.btn:hover{transform:translateY(-2px)}.btn:focus-visible{outline:3px solid currentColor;outline-offset:2px}
+.seal{font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:8px;border:1.5px solid;transform:rotate(-6deg);display:inline-block;position:relative;white-space:nowrap}
+.seal::after{content:"";position:absolute;inset:2px;border:1px dashed currentColor;border-radius:5px;opacity:.55}
+
+/* ===== 1: ふせん ===== */
+.v1{width:min(470px,100%);background:#fff8ee;border-radius:26px;padding:20px;box-shadow:0 36px 80px -16px rgb(60 30 20/.55);color:#4a3320}
+.v1 .top{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.v1 .top img{width:46px;height:46px;border-radius:14px}
+.v1 h2{margin:0;font-size:20px;font-weight:800}.v1 small{display:block;font-size:11px;font-weight:800;letter-spacing:.12em;color:#c27a3a}
+.v1 .x{margin-left:auto}
+.v1 .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.note{padding:14px 14px 12px;min-height:118px;border-radius:6px 6px 6px 22px;box-shadow:0 8px 14px -8px rgb(60 30 20/.45);position:relative;display:flex;flex-direction:column;gap:6px}
+.note:nth-child(1){background:#ffd9df;transform:rotate(-2.5deg)}.note:nth-child(2){background:#fff1a8;transform:rotate(2deg)}
+.note:nth-child(3){background:#cdeedd;transform:rotate(1.5deg)}.note:nth-child(4){background:#d4e4ff;transform:rotate(-2deg)}
+.note::before{content:"";position:absolute;top:-8px;left:50%;width:44px;height:16px;transform:translateX(-50%) rotate(-3deg);background:rgb(255 255 255/.6);border-radius:3px}
+.note .t{font-size:14px;font-weight:800;line-height:1.4;margin-top:6px}
+.note .m{font-family:"Klee One",cursive;font-size:13px;font-weight:600}
+.note .m.r{color:#c42b47}
+.note .seal{align-self:flex-start;margin-top:auto;color:#4a3320;background:rgb(255 255 255/.5)}
+.v1 .foot{display:flex;gap:10px;margin-top:20px;align-items:center}
+.v1 .btn.main{flex:1;background:#f08a4b;color:#fff;box-shadow:0 6px 0 #c96a30}.v1 .btn.main:active{transform:translateY(4px);box-shadow:0 2px 0 #c96a30}
+.v1 .more{font-size:12px;font-weight:800;color:#a48566}
+
+/* ===== 2: ふきだし ===== */
+.v2{width:min(430px,100%);display:grid;gap:12px;justify-items:start;color:#2e2a4a}
+.v2 .who{display:flex;align-items:flex-end;gap:12px}
+.v2 .who img{width:72px;height:72px;border-radius:50%;border:4px solid #fff;box-shadow:0 10px 22px -8px rgb(40 30 100/.6);background:#fff}
+.v2 .say{background:#fff;border-radius:22px 22px 22px 6px;padding:12px 16px;font-weight:800;font-size:15px;line-height:1.5;box-shadow:0 10px 24px -10px rgb(40 30 100/.5)}
+.v2 .say small{display:block;font-size:11px;color:#8a6fe0;letter-spacing:.1em}
+.v2 .bub{background:#fff;border-radius:26px 26px 26px 8px;padding:6px 10px;width:100%;box-shadow:0 20px 40px -14px rgb(40 30 100/.5)}
+.v2 .row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:12px 10px;border-bottom:2px dotted #e6def8}
+.v2 .row:last-child{border-bottom:0}
+.v2 .ico{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:14px;background:#efe8fc;color:#8a6fe0;font-weight:800}
+.v2 .row.r .ico{background:#ffe1e8;color:#dd4670}
+.v2 .t{font-weight:800;font-size:14.5px}.v2 .m{font-size:12px;color:#7a6f9a;font-weight:500}.v2 .row.r .m{color:#dd4670;font-weight:800}
+.v2 .seal.w{color:#8a6fe0}.v2 .seal.p{color:#e5559c}
+.v2 .foot{display:flex;gap:10px;width:100%;justify-content:flex-end}
+.v2 .btn.main{background:linear-gradient(120deg,#8a6fe0,#e57cb8);color:#fff;padding:0 28px;box-shadow:0 8px 18px -8px #8a6fe0}
+.v2 .btn.sub{background:rgb(255 255 255/.85);color:#2e2a4a;padding:0 20px}
+
+/* ===== 3: チケット ===== */
+.v3{width:min(400px,100%);color:#173a33}
+.v3 .tk{background:#fff;border-radius:22px;box-shadow:0 30px 60px -16px rgb(10 70 60/.55);position:relative;overflow:hidden}
+.v3 .tk .hd{background:linear-gradient(120deg,#25b99c,#5fc8e8);color:#fff;padding:18px 20px 22px;display:flex;align-items:center;gap:12px}
+.v3 .hd img{width:46px;height:46px;border-radius:14px;border:3px solid #fff}
+.v3 h2{margin:0;font-size:20px;font-weight:800}.v3 small{display:block;font-size:11px;font-weight:800;letter-spacing:.14em;opacity:.9}
+.v3 .x{margin-left:auto;background:rgb(255 255 255/.25);color:#fff}
+.v3 .cut{height:26px;position:relative;margin-top:-13px;background:radial-gradient(circle 13px at 0 50%,#c5e9df 98%,transparent) left/51% 100% no-repeat,radial-gradient(circle 13px at 100% 50%,#c5e9df 98%,transparent) right/51% 100% no-repeat}
+.v3 .cut::after{content:"";position:absolute;left:18px;right:18px;top:50%;border-top:3px dashed #bfe6db}
+.v3 .tk .bd{padding:6px 20px 8px}
+.v3 .big{display:flex;align-items:baseline;gap:8px;padding:2px 0 8px;color:#20a58d;font-weight:800}
+.v3 .big b{font-size:46px;line-height:1;font-family:"Manrope"}.v3 .big span{font-size:12px;color:#5d8279}
+.v3 .it{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:9px 0}
+.v3 .sq{width:22px;height:22px;border-radius:7px;border:2.5px solid #7fd8c3}
+.v3 .it.r .sq{border-color:#e0524f;background:#ffe3e3}.v3 .it.s .sq{border-color:#20a58d;background:#d8f4ec}
+.v3 .t{font-weight:800;font-size:14.5px}.v3 .m{font-size:12px;color:#5d8279}.v3 .it.r .m{color:#e0524f;font-weight:800}.v3 .it.s .m{color:#20a58d;font-weight:800}
+.v3 .seal.w{color:#20a58d}.v3 .seal.p{color:#ef7a8f}
+.v3 .foot{display:flex;gap:10px;padding:12px 20px 20px}
+.v3 .btn.main{flex:1;background:linear-gradient(120deg,#25b99c,#5fc8e8);color:#fff;border-radius:16px}.v3 .btn.sub{background:#f1fbf7;color:#173a33;border-radius:16px;padding:0 18px}
+
+/* ===== 4: 手帳 ===== */
+.v4{width:min(430px,100%);background:#fffdf5;border-radius:8px 24px 24px 8px;box-shadow:0 30px 60px -16px rgb(90 60 0/.55);padding:22px 22px 18px 54px;position:relative;color:#43361a}
+.v4::before{content:"";position:absolute;left:0;top:0;bottom:0;width:36px;background:#f5d572;border-radius:8px 0 0 8px}
+.v4 .rings{position:absolute;left:10px;top:24px;bottom:24px;width:30px;display:flex;flex-direction:column;justify-content:space-between}
+.v4 .rings i{display:block;height:12px;border-radius:999px;background:#fffdf5;box-shadow:inset 0 2px 3px rgb(90 60 0/.3);margin-left:-2px}
+.v4 .hd{display:flex;align-items:flex-end;gap:12px;padding-bottom:6px}
+.v4 .hd img{width:44px;height:44px;border-radius:12px;transform:rotate(-6deg)}
+.v4 h2{margin:0;font-family:"Klee One",cursive;font-size:24px;font-weight:600}.v4 small{font-family:"Klee One",cursive;color:#b9770a;font-weight:600;font-size:13px}
+.v4 .x{margin-left:auto;background:rgb(0 0 0/.05)}
+.v4 .list{margin-top:10px;background-image:linear-gradient(transparent 35px,rgb(224 160 16/.3) 36px);background-size:100% 36px}
+.v4 .ln{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;height:36px;font-family:"Klee One",cursive;font-weight:600;font-size:16px}
+.v4 .cb{width:18px;height:18px;border:2px solid #b9770a;border-radius:4px}
+.v4 .ln.r .cb{border-color:#d9482e}.v4 .ln.r{color:#d9482e}
+.v4 .ln span:nth-child(2){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.v4 .ln em{font-style:normal;font-size:12px;color:#8c7a4e;margin-left:8px}
+.v4 .ln.r em{color:#d9482e}
+.v4 .seal{color:#b9770a;font-family:"M PLUS Rounded 1c"}.v4 .seal.p{color:#d9602e}
+.v4 .more{font-family:"Klee One",cursive;font-size:13px;color:#8c7a4e;height:36px;display:flex;align-items:center}
+.v4 .foot{display:flex;gap:10px;margin-top:12px}
+.v4 .btn.main{flex:1;background:#f5b52a;color:#3a2400;border-radius:14px}.v4 .btn.sub{background:#fff;border:2px solid #f2dfa0;color:#43361a;border-radius:14px;padding:0 18px}
+
+/* ===== 5: まるい泡 ===== */
+.v5{width:min(440px,100%);padding:26px 22px 22px;border-radius:44px;background:linear-gradient(160deg,rgb(255 255 255/.8),rgb(246 240 255/.74));backdrop-filter:blur(20px);border:2px solid rgb(255 255 255/.9);box-shadow:0 40px 80px -20px rgb(70 40 140/.6);color:#2e2548;text-align:center}
+.v5 .av{width:84px;height:84px;margin:-6px auto 6px;border-radius:50%;border:4px solid #fff;box-shadow:0 12px 26px -8px rgb(138 111 224/.7);overflow:hidden;background:#fff}
+.v5 .av img{width:100%;height:100%;object-fit:cover}
+.v5 small{font-size:11px;font-weight:800;letter-spacing:.14em;color:#8a6fe0}
+.v5 h2{margin:2px 0 4px;font-size:22px;font-weight:800}
+.v5 .sub2{font-size:13px;color:#7a6f9a;font-weight:700;margin-bottom:14px}
+.v5 .cloud{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:16px}
+.bb{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:999px;background:#fff;font-weight:800;font-size:13.5px;box-shadow:0 8px 16px -10px rgb(138 111 224/.7);border:2px solid #efe8fc}
+.bb:nth-child(2n){transform:translateY(4px)}
+.bb i{font-style:normal;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;background:#efe8fc;color:#8a6fe0}
+.bb.r{border-color:#ffd3de}.bb.r i{background:#ffe3ec;color:#dd4670}
+.bb .seal{padding:1px 7px;font-size:10px}.bb .seal.w{color:#8a6fe0}.bb .seal.p{color:#e5559c}
+.v5 .foot{display:flex;gap:10px;justify-content:center}
+.v5 .btn.main{background:linear-gradient(120deg,#8a6fe0,#e57cb8);color:#fff;padding:0 34px;box-shadow:0 10px 20px -8px #8a6fe0}.v5 .btn.sub{background:#fff;color:#2e2548;padding:0 20px}
+.v5 .x{position:absolute;right:16px;top:16px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Mock · 10:00 Daily Dialog · Cute</div>
+  <h1>朝10時のダイアログ｜かわいい5案（作り直し）</h1>
+  <p class="lead">前回は色を変えただけでした。今回は、一覧の並べ方そのものを変えた5案です。タブで切り替えてください（ダミーデータ）。</p>
+  <div class="tabs" id="tabs" role="tablist"></div>
+  <div class="info" id="info"></div>
+  <div class="desk"><div id="host"></div><div class="bar">10:00</div></div>
+  <p class="cap">背景はパソコンのデスクトップのイメージです。ダイアログは画面の中央に出ます。</p>
+</div>
+<script>
+const IMG='<img src="icon-mock.webp" alt="">';
+const X='<button class="x" aria-label="閉じる">✕</button>';
+const seal=(c,t)=>c?`<span class="seal ${c}">${t}</span>`:"";
+const D=[
+ {n:"請求書を送る",m:"期限切れ 10/08(木)",c:"r",s:["w","仕事"]},
+ {n:"パスポートを更新する",m:"10/20(火)まで・あと10日",c:"s",s:["p","プライベート"]},
+ {n:"京都で紅葉を見る",m:"11/30(月)まで",c:"s",s:["p","プライベート"]},
+ {n:"写真をアルバムにまとめる",m:"12/31(木)まで",c:"",s:["",""]}];
+const V={
+ v1:()=>`<div class="v1"><div class="top">${IMG}<div><small>10月10日(土) · 10:00</small><h2>いつかやること</h2></div>${X}</div>
+  <div class="grid">${D.map(d=>`<div class="note"><div class="t">${d.n}</div><div class="m ${d.c==="r"?"r":""}">${d.m}</div>${seal(d.s[0],d.s[1])}</div>`).join("")}</div>
+  <div class="foot"><span class="more">ほか 3件</span><button class="btn main">アプリを開く</button></div></div>`,
+ v2:()=>`<div class="v2"><div class="who">${IMG}<div class="say"><small>10月10日(土) · 10:00</small>おはよう！いつかやること、<br>のこり 7件だよ</div></div>
+  <div class="bub">${D.map((d,i)=>`<div class="row ${d.c==="r"?"r":""}"><span class="ico">${d.c==="r"?"!":i+1}</span><div><div class="t">${d.n}</div><div class="m">${d.m}</div></div>${seal(d.s[0],d.s[1])}</div>`).join("")}</div>
+  <div class="foot"><button class="btn sub">閉じる</button><button class="btn main">アプリを開く</button></div></div>`,
+ v3:()=>`<div class="v3"><div class="tk"><div class="hd">${IMG}<div><small>10月10日(土) · 10:00</small><h2>いつかやること</h2></div>${X}</div><div class="cut"></div>
+  <div class="bd"><div class="big"><b>7</b><span>件 のこり ・ 期限切れ 1 ・ もうすぐ 2</span></div>
+  ${D.map(d=>`<div class="it ${d.c}"><span class="sq"></span><div><div class="t">${d.n}</div><div class="m">${d.m}</div></div>${seal(d.s[0],d.s[1])}</div>`).join("")}</div>
+  <div class="foot"><button class="btn main">アプリを開く</button><button class="btn sub">閉じる</button></div></div></div>`,
+ v4:()=>`<div class="v4"><div class="rings">${"<i></i>".repeat(7)}</div>
+  <div class="hd">${IMG}<div><small>10月10日(土)</small><h2>いつかやること</h2></div>${X}</div>
+  <div class="list">${D.map(d=>`<div class="ln ${d.c==="r"?"r":""}"><span class="cb"></span><span>${d.n}<em>${d.c==="r"?"期限切れ":(d.m.match(/あと\d+日/)?d.m.match(/あと\d+日/)[0]:d.m.replace(/\(.\)まで/,""))}</em></span>${seal(d.s[0],d.s[1])}</div>`).join("")}<div class="more">…ほか 3件</div></div>
+  <div class="foot"><button class="btn main">アプリを開く</button><button class="btn sub">閉じる</button></div></div>`,
+ v5:()=>`<div class="v5" style="position:relative">${X}<div class="av">${IMG}</div><small>10月10日(土) · 10:00</small><h2>いつかやること</h2><div class="sub2">のこり 7件 ・ 期限切れ 1 ・ もうすぐ 2</div>
+  <div class="cloud">${D.map(d=>{const dd=d.m.match(/あと\d+日/);return `<span class="bb ${d.c==="r"?"r":""}">${d.n}<i>${d.c==="r"?"期限切れ":dd?dd[0]:d.m.replace("まで","")}</i>${seal(d.s[0],d.s[1])}</span>`}).join("")}<span class="bb">ほか 3件</span></div>
+  <div class="foot"><button class="btn sub">閉じる</button><button class="btn main">アプリを開く</button></div></div>`};
+const T=[
+ {k:"v1",n:"ふせん",c:"linear-gradient(135deg,#ffb3c1,#ffe27a)",d:"4色のふせんが少し傾いて貼ってある。1つのタスクが1枚。マスキングテープつき。",f:"ぱっと見て楽しい"},
+ {k:"v2",n:"ふきだし",c:"linear-gradient(135deg,#8a6fe0,#e57cb8)",d:"ペンギンが「おはよう！のこり7件だよ」としゃべる。一覧は吹き出しの中。",f:"話しかけられる感じが好き"},
+ {k:"v3",n:"チケット",c:"linear-gradient(135deg,#25b99c,#5fc8e8)",d:"ミシン目つきのチケット。「のこり7」を大きく、下に四角いチェック枠の一覧。",f:"すっきり、でも楽しく"},
+ {k:"v4",n:"手帳",c:"linear-gradient(135deg,#f5d572,#f08a4b)",d:"リング綴じのノート。罫線の上に手書き風の文字で、やることが並ぶ。",f:"ほっこり・手書きっぽく"},
+ {k:"v5",n:"まるいあわ",c:"linear-gradient(135deg,#bfa9ee,#f1c8e2)",d:"一覧ではなく、丸いタグ（泡）がふわっと並ぶ。アイコンが真ん中に大きく。",f:"ふわふわ・見た目重視"}];
+function set(k){const t=T.find(x=>x.k===k);document.getElementById("host").innerHTML=V[k]();
+ document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.k===k));
+ document.getElementById("info").innerHTML=`<div class="L" style="background:${t.c}"></div><div><b>${t.n}</b><p>${t.d}</p></div><span class="for">${t.f}</span>`}
+document.getElementById("tabs").innerHTML=T.map((t,i)=>`<button role="tab" data-k="${t.k}">${i+1} ${t.n}</button>`).join("");
+document.querySelectorAll("#tabs button").forEach(b=>b.addEventListener("click",()=>set(b.dataset.k)));
+set("v1");
+</script>
+</body>
+</html>

@@ -14,8 +14,8 @@ import { fetchPendingTasks, KeyMissingError, DEFAULT_KEY } from "./fetch.mjs";
 const here = dirname(fileURLToPath(import.meta.url));
 const args = new Set(process.argv.slice(2));
 
-function errorView(title, message) {
-  return { kind: "error", heading: title, message };
+function errorView(say, path, detail) {
+  return { kind: "error", say, path: path || "", detail: detail || "" };
 }
 
 async function makeView() {
@@ -24,13 +24,11 @@ async function makeView() {
     return buildView(await fetchPendingTasks());
   } catch (e) {
     if (e instanceof KeyMissingError) {
-      return errorView("鍵ファイルが見つかりません",
-        "Firebase のサービスアカウント鍵(JSON)がまだ置かれていません。\n\n" +
-        `次の場所に key.json という名前で置いてください:\n${DEFAULT_KEY}\n\n` +
-        "別の場所に置く場合は、環境変数 SOMEDAY_KEY にそのパスを入れてください。\n" +
-        "鍵の作り方は notify\\README.md を見てください。");
+      return errorView("鍵ファイルが見つからないよ。置き場所はここ→", DEFAULT_KEY,
+        "key.json という名前で置いてね。別の場所なら、環境変数 SOMEDAY_KEY にパスを入れてね。作り方は notify\\README.md にあるよ。");
     }
-    return errorView("読み取りに失敗しました", `未完了のタスクを取得できませんでした。\n\n${e?.message ?? e}\n\nネットワークや鍵の権限を確認してください。`);
+    return errorView("読み取りに失敗しちゃった…", "", `${e?.message ?? e}
+ネットワークや鍵の権限を確認してね。`);
   }
 }
 
