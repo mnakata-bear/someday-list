@@ -152,7 +152,6 @@ a { color: var(--a1); text-underline-offset: 2px; word-break: break-all }
 .la .hello small, .lc .hero small, .ph-head small { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--a1); font-weight: 700 }
 .la .hello h1 { font-size: 30px; margin-top: 2px }
 .t.wpon.la .hello { background: var(--glass); border: 1px solid var(--border); border-radius: 20px; padding: 16px 20px }
-.la .row2 { display: grid; grid-template-columns: 1.1fr 1fr; gap: 16px }
 .la .list { display: grid; gap: 10px }
 .la .list .item { background: var(--glass); border: 1px solid var(--border); border-radius: 18px; padding: 14px 16px; box-shadow: 0 1px 2px rgb(30 20 60/.04) }
 .la .list .item.done { background: color-mix(in srgb, var(--glass) 70%, var(--surface2)) }
@@ -160,12 +159,11 @@ a { color: var(--a1); text-underline-offset: 2px; word-break: break-all }
 .t:not(.wpon).la .addbox { background: transparent; border: 0; padding: 0 }
 
 .lc .pc-in { padding: 32px 24px 64px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; align-items: start }
-.lc .hero { grid-column: span 2; background: linear-gradient(140deg, color-mix(in srgb, var(--a1) 16%, var(--glass)), color-mix(in srgb, var(--a2) 16%, var(--glass))) }
+.lc .hero { grid-column: 1 / span 3; background: linear-gradient(140deg, color-mix(in srgb, var(--a1) 16%, var(--glass)), color-mix(in srgb, var(--a2) 16%, var(--glass))) }
 .lc .hero h1 { font-size: 28px; font-weight: 700; margin: 4px 0 0 }
 .lc .hero .big { font-size: 52px }
-.lc .t-stamp { grid-column: span 2; align-self: stretch }
-.lc .t-list { grid-column: span 3; grid-row: span 2 }
-.lc .t-next { grid-row: span 2 }
+.lc .t-list { grid-column: 1 / span 3 }
+.lc .t-next { grid-column: 4; grid-row: 1 / span 2; align-self: stretch }
 .lc .t-list .list .item { padding: 12px 8px; border-radius: 12px }
 .lc .t-list .list .item:hover { background: color-mix(in srgb, var(--surface2) 70%, transparent) }
 .lc .list .item + .item { border-top: 1px solid var(--border) }
@@ -183,14 +181,11 @@ a { color: var(--a1); text-underline-offset: 2px; word-break: break-all }
 .ph-head .appicon { width: 36px; height: 36px; border-radius: 10px }
 .ph-head .brandrow { gap: 10px }
 .ph-head .sync { padding: 3px 8px; font-size: 11px }
-.ph-head [data-r="sync"] { grid-column: 1 / -1; justify-self: start; display: flex }
-.ph-head .iconbtn { width: 44px; height: 44px }
+.ph-r2 { grid-column: 1 / -1; grid-row: 2; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0 }
+.ph-r2 > [data-r="sync"] { display: flex; min-width: 0 }
+.ph-head .iconbtn { width: 44px; height: 44px; grid-column: 2; grid-row: 1 }
 .t.wpon .ph-head { background: var(--glass); border: 1px solid var(--border); border-radius: 18px; padding: 10px 14px }
-.ph-sum { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; color: var(--muted); margin-bottom: 8px }
-.ph-sum .big { font-size: 28px }
-.ph-card { padding: 14px 16px }
-.ph-card .scard { gap: 6px; margin-top: 4px }
-.ph-card .lab { margin: 14px 0 8px }
+.ph-card { padding: 10px 16px 12px }
 .la .ph-body .list { display: grid; gap: 8px }
 .la .ph-body .item { padding: 12px 10px 12px 14px; --ss: 44px; --sr: 10px; background: var(--glass); border: 1px solid var(--border); border-radius: 18px; box-shadow: 0 1px 2px rgb(30 20 60/.04) }
 .la .ph-body .item.done { background: color-mix(in srgb, var(--glass) 70%, var(--surface2)) }
@@ -366,3 +361,38 @@ dialog.ask .sheet-body p { margin: 0; font-size: 14px }
 .ph-foot .lblpick { order: 3; flex-basis: 100% }
 .ph-foot .add .btn { order: 2 }
 @media (max-width: 420px) { .lpill { padding: 0 11px } }
+
+/* ===== 進捗の細い1行(一覧の上) ===== */
+.card.pline { padding: 10px 16px 12px; border-radius: 16px }
+.pl-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; color: var(--muted); margin-bottom: 7px; font-weight: 700 }
+.pl-row .big { font-size: 17px; margin-right: 2px }
+.pl-p { font: 700 13px "Inter", sans-serif; color: var(--a1); font-variant-numeric: tabular-nums }
+.pline .prog { height: 5px }
+
+/* ===== ヘッダーのスタンプボタン ===== */
+.stbtn { height: 44px; min-width: 44px; flex: none; display: inline-flex; align-items: center; gap: 7px; padding: 0 14px 0 11px; border-radius: 999px; border: 1.5px solid color-mix(in srgb, var(--stamp) 55%, var(--border)); background: color-mix(in srgb, var(--stamp) 9%, var(--glass)); color: var(--stamp); font-size: 12px; font-weight: 700; letter-spacing: .02em; white-space: nowrap; cursor: pointer; transition: transform .18s var(--ease), border-color .18s, background-color .18s }
+.stbtn:hover { border-color: var(--stamp); transform: translateY(-1px) }
+.stbtn:focus-visible { outline: 3px solid var(--a1); outline-offset: 2px }
+.stbtn svg { width: 18px; height: 18px; flex: none }
+.stbtn [data-r] { display: inline-flex; align-items: baseline; gap: 4px; color: var(--text) }
+.stbtn .sbn { display: inline-block; font: 700 15px/1 "Inter", sans-serif; color: var(--stamp); font-variant-numeric: tabular-nums; margin-left: 1px }
+.stbtn .sbn.bump { animation: bump .6s var(--ease) both }
+@keyframes bump { 0% { transform: scale(1) } 35% { transform: translateY(-5px) scale(1.55) } 70% { transform: translateY(1px) scale(.92) } 100% { transform: scale(1) } }
+.lc .hero .hacts { flex-wrap: nowrap }
+
+/* ===== スタンプのドロワー(横から) ===== */
+.scrim { position: fixed; inset: 0; z-index: 70; background: rgb(12 18 32/.42); opacity: 0; transition: opacity .28s var(--ease) }
+.scrim.open { opacity: 1 }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; z-index: 71; width: min(88vw, 360px); display: flex; flex-direction: column; background: var(--surface); color: var(--text); border-left: 1px solid var(--border); box-shadow: -24px 0 60px -24px rgb(10 20 40/.45); transform: translateX(104%); visibility: hidden; transition: transform .3s var(--ease), visibility 0s linear .3s; font-family: "Manrope", "M PLUS 1p", sans-serif; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom) }
+.drawer.open { transform: none; visibility: visible; transition: transform .3s var(--ease), visibility 0s }
+@media (min-width: 900px) { .drawer { width: 380px } }
+.dr-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 16px 12px 22px; border-bottom: 1px solid var(--border) }
+.dr-head h2 { font-size: 18px }
+.dr-head small { display: block; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--a1); font-weight: 700 }
+.drawer .iconbtn { width: 44px; height: 44px }
+.dr-body { padding: 18px 20px 24px; overflow: auto; display: grid; gap: 14px; align-content: start; min-height: 0 }
+.dr-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 18px; padding: 16px }
+.dr-card .scard { gap: 8px }
+.dr-n { font-size: 14px; color: var(--muted); font-weight: 700 }
+.dr-n b { font: 700 32px/1 "Manrope", sans-serif; color: var(--a1); margin-right: 4px; font-variant-numeric: tabular-nums }
+@media (prefers-reduced-motion: reduce) { .drawer, .scrim { transition: none !important } }

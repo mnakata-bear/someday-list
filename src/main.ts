@@ -100,6 +100,7 @@ function applyTheme() {
 
 /* ================= テンプレート ================= */
 const gearBtn = `<button type="button" class="iconbtn" data-act="settings" aria-label="設定(テーマ・壁紙・スタンプ・レイアウト)">${I.gear}</button>`;
+const stampBtn = `<button type="button" class="stbtn" data-act="stamp" aria-haspopup="dialog" title="スタンプカードをひらく"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9" r="5"/><path d="M5 20h14M8 15.5h8v4.5H8z"/></svg><span data-r="stampBtn"></span></button>`;
 const micBtn = (k: string) => speechSupported()
   ? `<button type="button" class="mic" data-mic="${k}" aria-label="音声で入力" aria-pressed="false">${I.mic}</button>` : "";
 
@@ -112,25 +113,21 @@ const formHTML = () => `<form class="add" data-form="add" novalidate autocomplet
 
 function pcA() {
   return `<main class="pc-in">
-    <header class="hello gl"><div class="brandrow"><img class="appicon" src="${ICON}" alt="" width="44" height="44"><div><small>Someday List</small><h1>いつかやること</h1></div></div><div class="hacts"><span data-r="sync"></span>${gearBtn}</div></header>
-    <div class="row2">
-      <section class="card gl" data-r="statsA" aria-label="達成状況"></section>
-      <section class="card gl" aria-label="スタンプカード"><div class="lab">Stamp Card<span data-r="cardInfo"></span></div><div data-r="stamp"></div></section>
-    </div>
+    <header class="hello gl"><div class="brandrow"><img class="appicon" src="${ICON}" alt="" width="44" height="44"><div><small>Someday List</small><h1>いつかやること</h1></div></div><div class="hacts"><span data-r="sync"></span>${stampBtn}${gearBtn}</div></header>
+    <section class="card pline gl" data-r="progLine" aria-label="達成状況"></section>
     <div class="addbox gl">${formHTML()}</div>
     <section data-r="list" aria-label="やることの一覧"></section></main>`;
 }
 function pcC() {
   return `<main class="pc-in">
-    <section class="card hero gl"><div class="lab"><span class="brandrow" style="gap:10px"><img class="appicon" style="width:32px;height:32px;border-radius:9px" src="${ICON}" alt="" width="32" height="32"><small>Someday List</small></span><span class="hacts"><span data-r="sync"></span>${gearBtn}</span></div><h1>いつか、ちゃんとやる。</h1><div data-r="statsC"></div></section>
-    <section class="card t-stamp gl" aria-label="スタンプカード"><div class="lab">Stamp Card<span data-r="cardInfoC"></span></div><div data-r="stamp"></div></section>
+    <section class="card hero gl"><div class="lab"><span class="brandrow" style="gap:10px"><img class="appicon" style="width:32px;height:32px;border-radius:9px" src="${ICON}" alt="" width="32" height="32"><small>Someday List</small></span><span class="hacts"><span data-r="sync"></span>${stampBtn}${gearBtn}</span></div><h1>いつか、ちゃんとやる。</h1><div data-r="statsC"></div></section>
     <section class="card t-list gl"><div class="lab">いつかやること</div>${formHTML()}<div style="height:10px"></div><div data-r="list"></div></section>
     <section class="card t-next gl"><div class="lab">期限つき</div><div data-r="next"></div></section></main>`;
 }
 function phone() {
   return `<div class="ph"><div class="ph-body">
-    <header class="ph-head gl"><div class="brandrow"><img class="appicon" src="${ICON}" alt="" width="36" height="36"><div><small>Someday</small><h1>いつかやること</h1></div></div>${gearBtn}<span data-r="sync"></span></header>
-    <section class="card ph-card gl" aria-label="達成状況"><div data-r="statsPh"></div><div class="lab">Stamp Card<span data-r="cardInfo"></span></div><div data-r="stamp"></div></section>
+    <header class="ph-head gl"><div class="brandrow"><img class="appicon" src="${ICON}" alt="" width="36" height="36"><div><small>Someday</small><h1>いつかやること</h1></div></div><span class="ph-r2"><span data-r="sync"></span>${stampBtn}</span>${gearBtn}</header>
+    <section class="card ph-card pline gl" data-r="progLine" aria-label="達成状況"></section>
     <section data-r="list" aria-label="やることの一覧"></section>
   </div><footer class="ph-foot gl">${formHTML()}</footer></div>`;
 }
@@ -227,18 +224,22 @@ const REGIONS: Record<string, (now: number) => string> = {
   list: listHTML,
   stamp: stampHTML,
   cardInfo: () => cardInfo(false),
-  cardInfoC: () => cardInfo(true),
-  statsA: () => {
+  stampBtn: (now) => {
+    const { filled } = stampCardState(state.stampTotal);
+    const bump = cardPop && cardPop.until > now && state.stampTotal > cardPop.from ? " bump" : "";
+    return `スタンプ <b class="sbn${bump}" data-testid="stampcount">${filled}</b>/10`;
+  },
+  progLine: () => {
     const s = taskStats(state.tasks);
-    return `<div class="lab">叶えたこと<span>${s.pct}%</span></div><div class="big">${s.d}<small>/ ${s.all} 達成</small></div><div class="prog" style="margin-top:14px"><i style="width:${s.pct}%"></i></div>`;
+    return `<div class="pl-row"><span class="pl-t"><b class="big">${s.d}</b> / ${s.all} 達成</span><span class="pl-p">${s.pct}%</span></div><div class="prog"><i style="width:${s.pct}%"></i></div>`;
+  },
+  statsDr: () => {
+    const s = taskStats(state.tasks);
+    return `<div class="lab">叶えたこと<span>${s.pct}%</span></div><div class="dr-n"><b>${s.d}</b> / ${s.all} 達成</div><div class="prog" style="margin-top:10px"><i style="width:${s.pct}%"></i></div>`;
   },
   statsC: () => {
     const s = taskStats(state.tasks);
     return `<div style="display:flex;align-items:flex-end;gap:16px;margin-top:12px"><div class="big">${s.pct}<small>%</small></div><div style="flex:1;padding-bottom:8px"><div class="prog"><i style="width:${s.pct}%"></i></div><div style="font-size:12px;color:var(--muted);margin-top:6px">${s.d} / ${s.all} 達成 ・ のこり ${s.left}</div></div></div>`;
-  },
-  statsPh: () => {
-    const s = taskStats(state.tasks);
-    return `<div class="ph-sum"><span>${s.d} / ${s.all} 達成</span><span class="big">${s.pct}<small>%</small></span></div><div class="prog"><i style="width:${s.pct}%"></i></div>`;
   },
   next: () => {
     const dl = upcoming(state.tasks);
@@ -257,6 +258,8 @@ function addForm(): HTMLFormElement | null {
 
 function renderShell() {
   if (gate) {
+    closeDrawer(false);
+    drawerEl.querySelectorAll<HTMLElement>("[data-r]").forEach((el) => { el.innerHTML = ""; lastHTML.delete(el); });
     const key = `gate-${gate}-${gateBusy}-${gateMsg}`;
     if (key !== shellKey) {
       footObs?.disconnect();
@@ -289,11 +292,59 @@ function renderShell() {
   fill();
 }
 
+const drawerEl = document.getElementById("drawer") as HTMLElement;
+const scrimEl = document.getElementById("scrim") as HTMLElement;
+const drawerBody = drawerEl.querySelector("[data-dr-body]") as HTMLElement;
+drawerBody.innerHTML = `<section class="dr-card"><div class="lab">Stamp Card<span data-r="cardInfo"></span></div><div data-r="stamp"></div></section><section class="dr-card" aria-label="叶えたこと" data-r="statsDr"></section>`;
+let drawerOpener: HTMLElement | null = null;
+const drawerOpen = () => drawerEl.classList.contains("open");
+function openDrawer() {
+  if (gate || drawerOpen()) return;
+  const a = document.activeElement as HTMLElement | null;
+  drawerOpener = a && a !== document.body ? a : shell.querySelector<HTMLElement>('[data-act="stamp"]');
+  drawerEl.removeAttribute("inert");
+  scrimEl.hidden = false;
+  void drawerEl.offsetWidth; // 初期位置を確定させてから動かす
+  drawerEl.classList.add("open"); scrimEl.classList.add("open");
+  const closeBtn = drawerEl.querySelector<HTMLElement>("[data-dr-close]");
+  closeBtn?.focus();
+  if (document.activeElement !== closeBtn) {
+    // 開いた直後は描画の更新待ちでフォーカスできないことがあるため、少し待って再試行する
+    let n = 0;
+    const retry = () => { if (!drawerOpen() || drawerEl.contains(document.activeElement)) return; closeBtn?.focus(); if (document.activeElement !== closeBtn && ++n < 10) setTimeout(retry, 30); };
+    requestAnimationFrame(retry);
+  }
+  fill();
+}
+function closeDrawer(restore = true) {
+  if (!drawerOpen()) return;
+  drawerEl.classList.remove("open"); scrimEl.classList.remove("open");
+  drawerEl.setAttribute("inert", "");
+  setTimeout(() => { if (!drawerOpen()) scrimEl.hidden = true; }, 340);
+  const o = drawerOpener?.isConnected ? drawerOpener : shell.querySelector<HTMLElement>('[data-act="stamp"]');
+  drawerOpener = null;
+  if (restore) o?.focus();
+}
+scrimEl.addEventListener("click", () => closeDrawer());
+drawerEl.addEventListener("click", (e) => { if ((e.target as HTMLElement).closest("[data-dr-close]")) closeDrawer(); });
+document.addEventListener("keydown", (e) => {
+  if (!drawerOpen()) return;
+  if (e.key === "Escape") { if (document.querySelector("dialog[open]")) return; e.preventDefault(); closeDrawer(); return; }
+  if (e.key === "Tab") {
+    const f = [...drawerEl.querySelectorAll<HTMLElement>("button, [href], input, [tabindex]:not([tabindex='-1'])")].filter((x) => !x.hasAttribute("disabled"));
+    if (!f.length) return;
+    const first = f[0], last = f[f.length - 1], cur = document.activeElement;
+    if (!drawerEl.contains(cur)) { e.preventDefault(); first.focus(); }
+    else if (e.shiftKey && cur === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && cur === last) { e.preventDefault(); first.focus(); }
+  }
+});
+
 function fill() {
   const now = Date.now();
   const active = document.activeElement as HTMLElement | null;
   const focusId = active?.matches?.("input[data-id]") ? active.dataset.id : active?.matches?.("[data-flt]") ? "f:" + active.dataset.flt : active?.matches?.("[data-edit]") ? "e:" + active.dataset.edit : null;
-  shell.querySelectorAll<HTMLElement>("[data-r]").forEach((el) => {
+  [...shell.querySelectorAll<HTMLElement>("[data-r]"), ...(gate ? [] : drawerEl.querySelectorAll<HTMLElement>("[data-r]"))].forEach((el) => {
     const fn = REGIONS[el.dataset.r!];
     if (!fn) return;
     const html = fn(now);
@@ -446,6 +497,7 @@ shell.addEventListener("click", (e) => {
   if (tg.closest('[data-act="reload"]')) { location.reload(); return; }
   if (gate) return;
   if (tg.closest('[data-act="settings"]')) { openSettings(); return; }
+  if (tg.closest('[data-act="stamp"]')) { openDrawer(); return; }
   const flt = tg.closest<HTMLElement>("[data-flt]");
   if (flt) { setFilter(normalizeFilter(flt.dataset.flt)); return; }
   const lb = tg.closest<HTMLButtonElement>("[data-lbl]");

@@ -22,6 +22,11 @@
   <div class="bgwall" aria-hidden="true"></div>
   <div id="shell"><div class="loading" style="min-height:60vh"><span class="spin"></span>読み込み中…</div></div>
   <div id="toast" class="toast" role="status" aria-live="polite"><span class="tmsg"></span><button type="button" class="tact" hidden></button></div>
+  <div id="scrim" class="scrim" hidden></div>
+  <aside id="drawer" class="drawer" role="dialog" aria-modal="true" aria-label="スタンプカード" inert>
+    <div class="dr-head"><div><small>Stamp Card</small><h2>スタンプカード</h2></div><button type="button" class="iconbtn x" data-dr-close aria-label="スタンプカードを閉じる"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="dr-body" data-dr-body></div>
+  </aside>
   <dialog id="settings" class="sheet" aria-labelledby="st-h"></dialog>
   <dialog id="editor" class="sheet" aria-labelledby="ed-h"></dialog>
   <dialog id="ask" class="sheet ask" aria-labelledby="ask-h"></dialog>
