@@ -210,6 +210,33 @@ test("ログイン前に端末に保存されていたやることを、ログ�
   expect(await a.evaluate(() => JSON.parse(localStorage.getItem("someday-tasks-v1") || "{}").tasks?.length ?? 0)).toBe(0);
 });
 
+test("ラベル(仕事/プライベート)が、別アカウントのブラウザにも同期される", async ({ browser }) => {
+  const a = await open(browser, `lbl3-${Date.now()}`, ALLOWED);
+  const b = await open(browser, `lbl7-${Date.now()}`, ALLOWED2);
+  // A: 仕事ラベルを付けて追加 → B にチップつきで届く
+  await a.locator('.lblpick [data-lbl="work"]').click();
+  await addTask(a, "企画書を出す");
+  await expect(item(b, "企画書").locator(".lchip")).toHaveText("仕事", { timeout: 15_000 });
+  // B: プライベートに変更 → A に反映
+  await item(b, "企画書").locator("[data-edit]").click();
+  await b.locator('#editor [data-elbl="private"]').click();
+  await b.locator('#editor button[type="submit"]').click();
+  await expect(item(a, "企画書").locator(".lchip")).toHaveText("プライベート", { timeout: 15_000 });
+  // B: 絞り込みは端末ごと(A の表示は変わらない)
+  await b.locator('[data-flt="work"]').click();
+  await expect(b.locator(".list .item")).toHaveCount(0);
+  await expect(a.locator(".list .item")).toHaveCount(1);
+  // B: ラベルを外す → A でチップが消える
+  await b.locator('[data-flt="all"]').click();
+  await item(b, "企画書").locator("[data-edit]").click();
+  await b.locator('#editor [data-elbl="private"]').click();
+  await b.locator('#editor button[type="submit"]').click();
+  await expect(item(a, "企画書").locator(".lchip")).toHaveCount(0, { timeout: 15_000 });
+  // クラウドに保存された値を確認(label は空文字)
+  const docs = await (await fetch(`${FS}/spaces/home/tasks`, { headers: OWNER })).json();
+  expect(docs.documents[0].fields.label.stringValue).toBe("");
+});
+
 /* ---------- 旧データ(users/{uid}/...)から共有スペースへの移行 ---------- */
 const uidOf = (page: Page) => page.evaluate(() => (window as unknown as { __someday: { uid(): string | null } }).__someday.uid());
 

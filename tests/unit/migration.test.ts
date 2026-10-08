@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { hasLegacyData, planMigration } from "../../src/core/migration";
 import type { Task } from "../../src/core/types";
 
-const t = (id: string, p: Partial<Task> = {}): Task => ({ id, title: id, due: "", note: "", done: false, doneAt: null, createdAt: 1, updatedAt: 1, ...p });
+const t = (id: string, p: Partial<Task> = {}): Task => ({ id, title: id, due: "", note: "", label: "", done: false, doneAt: null, createdAt: 1, updatedAt: 1, ...p });
 const empty = { taskIds: new Set<string>(), stampTotal: 0, hasSettings: false };
 
 describe("旧データの移行計画", () => {

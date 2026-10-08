@@ -1,3 +1,7 @@
+/** ラベル。"" は未設定 */
+export type Label = "work" | "private" | "";
+export const LABELS: Record<"work" | "private", string> = { work: "仕事", private: "プライベート" };
+
 export interface Task {
   id: string;
   title: string;
@@ -5,6 +9,8 @@ export interface Task {
   due: string;
   /** メモ(任意・最大2000字) */
   note: string;
+  /** ラベル(任意)。未設定は "" */
+  label: Label;
   done: boolean;
   /** 完了にした日時(ms)。未完了なら null */
   doneAt: number | null;
@@ -28,10 +34,12 @@ export interface NewTaskInput {
   title: string;
   due: string;
   note?: string;
+  label?: Label;
 }
 
 export interface TaskPatch {
   title?: string;
   due?: string;
   note?: string;
+  label?: Label;
 }

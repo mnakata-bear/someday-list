@@ -6,7 +6,7 @@ import {
 import type { Task } from "../../src/core/types";
 
 const TODAY = new Date(2026, 9, 9, 15, 30); // 2026/10/9(金) 午後でも日付単位で数える
-const task = (p: Partial<Task> & { id: string }): Task => ({ title: p.id, due: "", note: "", done: false, doneAt: null, createdAt: 0, updatedAt: 0, ...p });
+const task = (p: Partial<Task> & { id: string }): Task => ({ title: p.id, due: "", note: "", label: "", done: false, doneAt: null, createdAt: 0, updatedAt: 0, ...p });
 
 describe("dueInfo", () => {
   it("期限なしは「いつでも」", () => {

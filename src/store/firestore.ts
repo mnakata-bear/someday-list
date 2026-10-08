@@ -3,7 +3,7 @@ import {
   type DocumentData, type Firestore, type QueryDocumentSnapshot,
 } from "firebase/firestore";
 import type { NewTaskInput, Settings, Task, TaskPatch } from "../core/types";
-import { applyStampDelta, diffTasks, normalizeSettings } from "../core/logic";
+import { applyStampDelta, diffTasks, normalizeLabel, normalizeSettings } from "../core/logic";
 import type { ErrorSink, Store, StoreState } from "./types";
 import { buildTask, cleanPatch } from "./local";
 
@@ -144,7 +144,7 @@ export class FirestoreStore implements Store {
 }
 
 export function toData(t: Task) {
-  return { title: t.title, due: t.due, note: t.note, done: t.done, doneAt: t.doneAt, createdAt: t.createdAt, updatedAt: t.updatedAt };
+  return { title: t.title, due: t.due, note: t.note, label: t.label, done: t.done, doneAt: t.doneAt, createdAt: t.createdAt, updatedAt: t.updatedAt };
 }
 
 export function toTask(d: QueryDocumentSnapshot<DocumentData>): Task {
@@ -154,6 +154,7 @@ export function toTask(d: QueryDocumentSnapshot<DocumentData>): Task {
     title: String(x.title ?? ""),
     due: typeof x.due === "string" ? x.due : "",
     note: typeof x.note === "string" ? x.note : "",
+    label: normalizeLabel(x.label),
     done: !!x.done,
     doneAt: typeof x.doneAt === "number" ? x.doneAt : null,
     createdAt: typeof x.createdAt === "number" ? x.createdAt : 0,

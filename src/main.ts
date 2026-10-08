@@ -1,9 +1,10 @@
 import "./styles.css";
-import type { Settings, Task } from "./core/types";
+import type { Label, Settings, Task } from "./core/types";
+import { LABELS } from "./core/types";
 import { LAYOUTS, STAMPS, THEMES, WPS, stampMark } from "./core/themes";
 import {
-  NOTE_MAX, dueInfo, esc, firstLine, linkify, md, normalizeSettings, sortTasks, stampCardState, taskStats, upcoming,
-  validateDue, validateNote, validateTitle,
+  NOTE_MAX, dueInfo, esc, filterTasks, firstLine, labelCounts, linkify, md, normalizeFilter, normalizeSettings, sortTasks, stampCardState, taskStats, upcoming,
+  validateDue, validateLabel, validateNote, validateTitle, type LabelFilter,
 } from "./core/logic";
 import { parseSpoken } from "./core/spoken";
 import { LocalStore } from "./store/local";
@@ -52,6 +53,18 @@ let online = navigator.onLine;
 let remoteBusyUntil = 0;
 let editingId: string | null = null;
 
+/* ラベル: 絞り込みは端末ごとに localStorage、追加フォームで選んだラベルはメモリ内(次の追加でも維持) */
+const FILTER_KEY = "someday-filter-v1";
+let filter: LabelFilter = (() => { try { return normalizeFilter(localStorage.getItem(FILTER_KEY)); } catch { return "all" as LabelFilter; } })();
+let addLabel: Label = "";
+/** 追加するときに付けるラベル(絞り込み中はそのラベルに固定) */
+const effectiveAddLabel = (): Label => (filter === "all" ? addLabel : filter);
+function setFilter(f: LabelFilter) {
+  filter = f;
+  try { localStorage.setItem(FILTER_KEY, f); } catch { /* 保存できなくても動く */ }
+  fill();
+}
+
 /**
  * ログインの壁(Firebase 設定ありのビルドだけ)。null のときだけアプリ画面を描画する。
  *   checking: ログイン状態の確認中 / login: 未ログイン / error: クラウドに接続できない
@@ -63,7 +76,7 @@ let gateBusy = false;
 const EMPTY_STATE: StoreState = { tasks: [], stampTotal: 0, ready: false, pending: false, remote: null };
 
 /** チェック時のスタンプ押下・他端末からの変更のハイライト(期限つき) */
-const fx = new Map<string, { kind: "pop" | "flash"; until: number }>();
+const fx = new Map<string, { kind: "pop" | "flash" | "lbl"; until: number }>();
 let cardPop: { from: number; until: number } | null = null;
 
 /* ================= テーマ ================= */
@@ -93,7 +106,8 @@ const micBtn = (k: string) => speechSupported()
 const formHTML = () => `<form class="add" data-form="add" novalidate autocomplete="off">
   <span class="vstat" data-vstat="add" hidden>聞いています…</span>
   <div class="tin"><input type="text" name="t" placeholder="いつかやりたいことを追加…" aria-label="やること" maxlength="100" enterkeyhint="done">${micBtn("add")}</div>
-  <label class="dwrap">期限<small>(任意)</small><input type="date" name="d" aria-label="期限（任意）"></label><button class="btn" type="submit">追加</button>
+  <label class="dwrap">期限<small>(任意)</small><input type="date" name="d" aria-label="期限（任意）"></label>
+  <div class="lblpick" role="group" aria-label="ラベル(任意)">${(["work", "private"] as const).map((k) => `<button type="button" class="lpill ${k}" data-lbl="${k}" aria-pressed="false">${LABELS[k]}</button>`).join("")}</div><button class="btn" type="submit">追加</button>
   <p class="ferr" role="alert" hidden></p></form>`;
 
 function pcA() {
@@ -168,10 +182,12 @@ function itemHTML(t: Task, now: number) {
   const stamp = t.done
     ? `<span class="stamp${pop}" aria-label="完了スタンプ"><b>${STAMPS[settings.stamp].t}</b><i>${t.doneAt ? md(new Date(t.doneAt)) : ""}</i></span>` : "";
   const nl = t.note ? firstLine(t.note) : "";
+  const lpop = f && f.kind === "lbl" && f.until > now ? " lpop" : "";
+  const chip = t.label ? `<span class="lchip ${t.label}${lpop}" data-testid="label-chip">${LABELS[t.label]}</span>` : "";
   const noteRow = t.note ? `<span class="notex" title="メモ">${I.note}<span class="nt">${linkify(nl) || "メモあり"}</span></span>` : "";
   return `<li class="item${t.done ? " done" : ""}${flash}" data-task="${esc(t.id)}">
     <label class="ck"><input type="checkbox" data-id="${esc(t.id)}" ${t.done ? "checked" : ""} aria-label="${esc(t.title)}を完了にする"><span>${I.ckSvg}</span></label>
-    <div class="ibody" data-open="${esc(t.id)}"><div class="title">${esc(t.title)}</div><div class="meta"><span class="due ${di.cls}">${di.cls === "none" ? "" : I.cal}${di.txt}</span>${noteRow}</div></div>
+    <div class="ibody" data-open="${esc(t.id)}"><div class="title">${esc(t.title)}</div><div class="meta"><span class="mrow"><span class="due ${di.cls}">${di.cls === "none" ? "" : I.cal}${di.txt}</span>${chip}</span>${noteRow}</div></div>
     <button type="button" class="ebtn" data-edit="${esc(t.id)}" aria-label="「${esc(t.title)}」を編集">${I.pencil}</button>${stamp}</li>`;
 }
 
@@ -180,8 +196,12 @@ const loadingHTML = `<div class="loading" role="status"><span class="spin"></spa
 
 function listHTML(now: number) {
   if (!authResolved || !state.ready) return loadingHTML;
-  const l = sortTasks(state.tasks);
-  return l.length ? `<ul class="list">${l.map((t) => itemHTML(t, now)).join("")}</ul>` : emptyHTML;
+  const c = labelCounts(state.tasks);
+  const tabs = `<div class="ftabs" role="group" aria-label="ラベルで絞り込み" data-testid="ftabs">${([["all", "すべて"], ["work", LABELS.work], ["private", LABELS.private]] as const)
+    .map(([k, n]) => `<button type="button" class="lpill ${k}" data-flt="${k}" aria-pressed="${filter === k}">${n}<em>${c[k]}</em></button>`).join("")}</div>`;
+  const l = sortTasks(filterTasks(state.tasks, filter));
+  const empty = state.tasks.length ? `<div class="empty"><b>${filter === "all" ? "まっさら！" : `${LABELS[filter]}のやることはまだありません`}</b>追加するときに、ラベルを付けられます</div>` : emptyHTML;
+  return tabs + (l.length ? `<ul class="list">${l.map((t) => itemHTML(t, now)).join("")}</ul>` : empty);
 }
 
 function stampHTML(now: number) {
@@ -272,7 +292,7 @@ function renderShell() {
 function fill() {
   const now = Date.now();
   const active = document.activeElement as HTMLElement | null;
-  const focusId = active?.matches?.("input[data-id]") ? active.dataset.id : active?.matches?.("[data-edit]") ? "e:" + active.dataset.edit : null;
+  const focusId = active?.matches?.("input[data-id]") ? active.dataset.id : active?.matches?.("[data-flt]") ? "f:" + active.dataset.flt : active?.matches?.("[data-edit]") ? "e:" + active.dataset.edit : null;
   shell.querySelectorAll<HTMLElement>("[data-r]").forEach((el) => {
     const fn = REGIONS[el.dataset.r!];
     if (!fn) return;
@@ -281,8 +301,14 @@ function fill() {
     lastHTML.set(el, html);
     el.innerHTML = html;
   });
+  const al = effectiveAddLabel();
+  shell.querySelectorAll<HTMLButtonElement>(".lblpick .lpill[data-lbl]").forEach((b) => {
+    b.setAttribute("aria-pressed", String(b.dataset.lbl === al));
+    b.disabled = filter !== "all"; // 絞り込み中は、そのラベルで追加する
+    b.title = filter !== "all" ? "絞り込み中は、そのラベルで追加されます" : "";
+  });
   if (focusId && !shell.contains(active)) {
-    const sel = focusId.startsWith("e:") ? `[data-edit="${CSS.escape(focusId.slice(2))}"]` : `input[data-id="${CSS.escape(focusId)}"]`;
+    const sel = focusId.startsWith("f:") ? `[data-flt="${CSS.escape(focusId.slice(2))}"]` : focusId.startsWith("e:") ? `[data-edit="${CSS.escape(focusId.slice(2))}"]` : `input[data-id="${CSS.escape(focusId)}"]`;
     shell.querySelector<HTMLElement>(sel)?.focus();
   }
 }
@@ -400,7 +426,9 @@ shell.addEventListener("submit", (e) => {
     return;
   }
   try {
-    const t = store.add({ title: v.value, due: dv.value });
+    const label = effectiveAddLabel();
+    const t = store.add({ title: v.value, due: dv.value, label });
+    if (label) { fx.set(t.id, { kind: "lbl", until: Date.now() + 900 }); scheduleFxCleanup(); fill(); }
     ti.value = ""; di.value = ""; err.hidden = true;
     toast("追加しました", { label: "メモを書く", action: () => openEditor(t.id, { note: true }), ms: 3500 });
   } catch (ex) {
@@ -418,6 +446,10 @@ shell.addEventListener("click", (e) => {
   if (tg.closest('[data-act="reload"]')) { location.reload(); return; }
   if (gate) return;
   if (tg.closest('[data-act="settings"]')) { openSettings(); return; }
+  const flt = tg.closest<HTMLElement>("[data-flt]");
+  if (flt) { setFilter(normalizeFilter(flt.dataset.flt)); return; }
+  const lb = tg.closest<HTMLButtonElement>("[data-lbl]");
+  if (lb) { if (lb.disabled) return; const k = lb.dataset.lbl as Label; addLabel = addLabel === k ? "" : k; fill(); return; }
   const mic = tg.closest<HTMLElement>('[data-mic="add"]');
   if (mic) { voiceAdd.toggle(); return; }
   const ed = tg.closest<HTMLElement>("[data-edit]");
@@ -502,6 +534,7 @@ function openEditor(id: string, opt: { note?: boolean } = {}) {
     <div class="sheet-body">
       <label class="fld"><span>やること</span><input type="text" name="title" maxlength="100" value="${esc(t.title)}" required></label>
       <div class="fld"><span class="fl">期限</span><div class="drow"><input type="date" name="due" value="${esc(t.due)}" aria-label="期限"><button type="button" class="ghost" data-clear-due>期限なし</button></div></div>
+      <div class="fld"><span class="fl">ラベル</span><div class="lblpick" role="group" aria-label="ラベル"><input type="hidden" name="label" value="${t.label}">${(["work", "private"] as const).map((k) => `<button type="button" class="lpill ${k}" data-elbl="${k}" aria-pressed="${t.label === k}">${LABELS[k]}</button>`).join("")}</div></div>
       <div class="fld notefld">
         <div class="note-head"><span class="fl">メモ</span>${hasNote ? '<button type="button" class="linkbtn" data-note-edit>編集</button>' : ""}</div>
         ${hasNote ? `<div class="note-view" data-testid="note-view">${linkify(t.note)}</div>` : '<button type="button" class="linkbtn" data-note-edit>＋ メモを追加</button>'}
@@ -539,6 +572,13 @@ editorDlg.addEventListener("click", (e) => {
   if (tg.closest("[data-close]")) { editorDlg.close(); return; }
   if (tg.closest("[data-clear-due]")) { (editorDlg.querySelector("input[name=due]") as HTMLInputElement).value = ""; return; }
   if (tg.closest("[data-note-edit]")) { showNoteEdit(); return; }
+  const el = tg.closest<HTMLElement>("[data-elbl]");
+  if (el) {
+    const hid = editorDlg.querySelector<HTMLInputElement>("input[name=label]")!;
+    hid.value = hid.value === el.dataset.elbl ? "" : el.dataset.elbl!;
+    editorDlg.querySelectorAll<HTMLElement>("[data-elbl]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.elbl === hid.value)));
+    return;
+  }
   if (tg.closest('[data-mic="note"]')) { voiceNote.toggle(); return; }
   if (tg.closest("[data-del]")) {
     const id = editingId!;
@@ -563,10 +603,12 @@ editorDlg.addEventListener("submit", (e) => {
   const due = validateDue((f.elements.namedItem("due") as HTMLInputElement).value);
   const noteBox = f.querySelector<HTMLElement>(".note-edit")!;
   const note = noteBox.hidden ? { ok: true as const, value: cur.note } : validateNote((f.elements.namedItem("note") as HTMLTextAreaElement).value);
-  const bad = [title, due, note].find((v) => !v.ok) as { error: string } | undefined;
+  const label = validateLabel((f.elements.namedItem("label") as HTMLInputElement).value);
+  const bad = [title, due, note, label].find((v) => !v.ok) as { error: string } | undefined;
   if (bad) { err.textContent = bad.error; err.hidden = false; return; }
-  const patch = { title: (title as { value: string }).value, due: (due as { value: string }).value, note: (note as { value: string }).value };
-  if (patch.title !== cur.title || patch.due !== cur.due || patch.note !== cur.note) {
+  const patch = { title: (title as { value: string }).value, due: (due as { value: string }).value, note: (note as { value: string }).value, label: (label as { value: Label }).value };
+  if (patch.title !== cur.title || patch.due !== cur.due || patch.note !== cur.note || patch.label !== cur.label) {
+    if (patch.label && patch.label !== cur.label) { fx.set(id, { kind: "lbl", until: Date.now() + 900 }); scheduleFxCleanup(); }
     store.update(id, patch);
     toast("保存しました");
   }

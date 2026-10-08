@@ -36,6 +36,7 @@ function isValidTask(t: Task): boolean {
     && t.title.length >= 1 && t.title.length <= 100
     && (t.due === "" || /^\d{4}-\d{2}-\d{2}$/.test(t.due))
     && t.note.length <= 2000
+    && (t.label === "" || t.label === "work" || t.label === "private")
     && Number.isInteger(t.createdAt) && Number.isInteger(t.updatedAt)
     && (t.doneAt === null || Number.isInteger(t.doneAt));
 }

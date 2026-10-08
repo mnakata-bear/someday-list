@@ -341,3 +341,28 @@ dialog.ask .sheet-body p { margin: 0; font-size: 14px }
   .gate-title { font-size: 24px }
   .gate-btn { min-width: 0; width: 100% }
 }
+
+/* ラベル(はんこ風)。仕事=--a1、プライベート=--a2 の単色インク。完了スタンプ(--stamp)とは別物で、メタ行に置く */
+.work { --ink: var(--a1) }
+.private { --ink: var(--a2) }
+.mrow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0 }
+.lchip { position: relative; display: inline-flex; align-items: center; padding: 1px 8px; margin: 2px 2px 2px 0; border: 1.5px solid var(--ink); border-radius: 7px; color: color-mix(in srgb, var(--ink) 82%, var(--text)); font-size: 11px; font-weight: 700; letter-spacing: .06em; line-height: 1.5; white-space: nowrap; transform: rotate(-6deg); mix-blend-mode: var(--blend); opacity: .92 }
+.lchip::after { content: ""; position: absolute; inset: 2px; border: 1px solid var(--ink); border-radius: 4px; opacity: .55; pointer-events: none }
+.dk .lchip { box-shadow: 0 0 10px -3px var(--ink), inset 0 0 8px -4px var(--ink); text-shadow: 0 0 6px color-mix(in srgb, var(--ink) 60%, transparent) }
+.item.done .lchip { opacity: .55 }
+.lchip.lpop { animation: lpress .5s var(--ease) both }
+@keyframes lpress { 0% { opacity: 0; transform: rotate(-24deg) scale(2) } 55% { opacity: .95; transform: rotate(-4deg) scale(.92) } 100% { opacity: .92; transform: rotate(-6deg) scale(1) } }
+.lpill { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 14px; border: 1.5px solid color-mix(in srgb, var(--ink, var(--muted)) 55%, var(--border)); border-radius: 12px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .04em; cursor: pointer; white-space: nowrap; transition: all .18s var(--ease) }
+.lpill::after { content: ""; position: absolute; inset: 3px; border: 1px solid currentColor; border-radius: 8px; opacity: .22; pointer-events: none }
+.lpill em { font-style: normal; font-variant-numeric: tabular-nums; font-size: 11px; opacity: .85 }
+.lpill[aria-pressed="true"] { border-color: var(--ink, var(--text)); color: var(--text); background: color-mix(in srgb, var(--ink, var(--text)) 16%, var(--surface)); transform: rotate(-2deg) }
+.lpill[aria-pressed="true"]::after { opacity: .6; border-color: var(--ink, var(--text)) }
+.lpill.all { --ink: var(--text) }
+.lpill:disabled { cursor: default; opacity: .6 }
+.lpill:disabled[aria-pressed="true"] { opacity: 1 }
+.lpill:focus-visible { outline: 3px solid var(--soft); outline-offset: 2px }
+.lblpick { display: inline-flex; gap: 6px; flex-wrap: wrap }
+.ftabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px }
+.ph-foot .lblpick { order: 3; flex-basis: 100% }
+.ph-foot .add .btn { order: 2 }
+@media (max-width: 420px) { .lpill { padding: 0 11px } }

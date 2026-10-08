@@ -89,7 +89,7 @@ describe("LocalStore CRUD", () => {
     mem.setItem(TASKS_KEY, "{not json");
     expect(mk().snapshot()).toEqual({ tasks: [], stampTotal: 0 });
     mem.setItem(TASKS_KEY, JSON.stringify({ tasks: [{ id: "x", title: "古い" }, { bad: 1 }], stampTotal: -3 }));
-    expect(mk().snapshot()).toEqual({ tasks: [{ id: "x", title: "古い", due: "", note: "", done: false, doneAt: null, createdAt: 0, updatedAt: 0 }], stampTotal: 0 });
+    expect(mk().snapshot()).toEqual({ tasks: [{ id: "x", title: "古い", due: "", note: "", label: "", done: false, doneAt: null, createdAt: 0, updatedAt: 0 }], stampTotal: 0 });
   });
 });
 

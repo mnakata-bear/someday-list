@@ -1,4 +1,4 @@
-import type { Settings, Task } from "./types";
+import type { Label, Settings, Task } from "./types";
 import { DEFAULT_SETTINGS } from "./types";
 import { LAYOUTS, STAMPS, THEMES, WPS } from "./themes";
 
@@ -95,6 +95,31 @@ export function validateNote(raw: unknown): Valid<string> {
   return { ok: true, value: v };
 }
 
+/** 不明な値は未設定("")に寄せる(読み込み用。古いデータ・壊れたデータでも落ちない) */
+export function normalizeLabel(raw: unknown): Label {
+  return raw === "work" || raw === "private" ? raw : "";
+}
+
+/** 書き込み用。許可値以外はエラー */
+export function validateLabel(raw: unknown): Valid<Label> {
+  if (raw == null) return { ok: true, value: "" };
+  if (raw === "work" || raw === "private" || raw === "") return { ok: true, value: raw };
+  return { ok: false, error: "ラベルが正しくありません" };
+}
+
+/** 絞り込み: all=すべて / work / private */
+export type LabelFilter = "all" | "work" | "private";
+export function normalizeFilter(raw: unknown): LabelFilter {
+  return raw === "work" || raw === "private" ? raw : "all";
+}
+export function filterTasks(ts: Task[], f: LabelFilter): Task[] {
+  return f === "all" ? ts : ts.filter((t) => t.label === f);
+}
+/** 絞り込みタブの件数(未設定のタスクは「すべて」にだけ数える) */
+export function labelCounts(ts: Task[]): Record<LabelFilter, number> {
+  return { all: ts.length, work: ts.filter((t) => t.label === "work").length, private: ts.filter((t) => t.label === "private").length };
+}
+
 /* ---------- 設定 ---------- */
 export function normalizeSettings(raw: unknown): Settings {
   const s = (raw && typeof raw === "object" ? raw : {}) as Partial<Settings>;
@@ -117,7 +142,7 @@ export function diffTasks(prev: Task[], next: Task[]): RemoteChange | null {
     const p = pm.get(t.id);
     if (!p) { ids.push(t.id); msg ||= "別の端末から追加されました"; continue; }
     if (p.done !== t.done) { ids.push(t.id); msg ||= `別の端末から同期 ・ ${t.done ? "達成！" : "未完了に戻しました"}`; continue; }
-    if (p.title !== t.title || p.due !== t.due || p.note !== t.note) { ids.push(t.id); msg ||= "別の端末から同期 ・ 更新しました"; }
+    if (p.title !== t.title || p.due !== t.due || p.note !== t.note || p.label !== t.label) { ids.push(t.id); msg ||= "別の端末から同期 ・ 更新しました"; }
   }
   let removed = 0;
   for (const p of prev) if (!nm.has(p.id)) removed++;

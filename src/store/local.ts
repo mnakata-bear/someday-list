@@ -1,5 +1,5 @@
 import type { NewTaskInput, Settings, Task, TaskPatch } from "../core/types";
-import { applyStampDelta, diffTasks, normalizeSettings, validateDue, validateNote, validateTitle } from "../core/logic";
+import { applyStampDelta, diffTasks, normalizeLabel, normalizeSettings, validateDue, validateLabel, validateNote, validateTitle } from "../core/logic";
 import type { Store, StoreState } from "./types";
 
 export const TASKS_KEY = "someday-tasks-v1";
@@ -21,7 +21,9 @@ export function buildTask(input: NewTaskInput, id: string, now: number): Task {
   if (!due.ok) throw new Error(due.error);
   const note = validateNote(input.note ?? "");
   if (!note.ok) throw new Error(note.error);
-  return { id, title: title.value, due: due.value, note: note.value, done: false, doneAt: null, createdAt: now, updatedAt: now };
+  const label = validateLabel(input.label ?? "");
+  if (!label.ok) throw new Error(label.error);
+  return { id, title: title.value, due: due.value, note: note.value, label: label.value, done: false, doneAt: null, createdAt: now, updatedAt: now };
 }
 
 export function cleanPatch(patch: TaskPatch): TaskPatch {
@@ -29,6 +31,7 @@ export function cleanPatch(patch: TaskPatch): TaskPatch {
   if (patch.title !== undefined) { const v = validateTitle(patch.title); if (!v.ok) throw new Error(v.error); out.title = v.value; }
   if (patch.due !== undefined) { const v = validateDue(patch.due); if (!v.ok) throw new Error(v.error); out.due = v.value; }
   if (patch.note !== undefined) { const v = validateNote(patch.note); if (!v.ok) throw new Error(v.error); out.note = v.value; }
+  if (patch.label !== undefined) { const v = validateLabel(patch.label); if (!v.ok) throw new Error(v.error); out.label = v.value; }
   return out;
 }
 
@@ -36,7 +39,7 @@ export function cleanPatch(patch: TaskPatch): TaskPatch {
 function sanitize(raw: unknown): Saved {
   const r = (raw && typeof raw === "object" ? raw : {}) as Partial<Saved>;
   const tasks = Array.isArray(r.tasks) ? r.tasks.filter((t) => t && typeof t.id === "string" && typeof t.title === "string").map((t) => ({
-    id: t.id, title: t.title, due: typeof t.due === "string" ? t.due : "", note: typeof t.note === "string" ? t.note : "",
+    id: t.id, title: t.title, due: typeof t.due === "string" ? t.due : "", note: typeof t.note === "string" ? t.note : "", label: normalizeLabel((t as { label?: unknown }).label),
     done: !!t.done, doneAt: typeof t.doneAt === "number" ? t.doneAt : null,
     createdAt: typeof t.createdAt === "number" ? t.createdAt : 0, updatedAt: typeof t.updatedAt === "number" ? t.updatedAt : 0,
   })) : [];
