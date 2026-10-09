@@ -3,6 +3,8 @@
 // show.ps1 → node(標準出力)
 //   DONE <id> / UNDONE <id>        完了 / 未完了に戻す
 //   ADD <req> <base64(JSON)>       新規追加 {title, due, label}(req は返事を対応づけるための番号)
+//   EDIT <req> <base64(JSON)>      編集 {id, title?, due?, note?, label?, ca?}(更新するのは渡した項目だけ。done は変えない)
+//   DELETE <id> / UNDELETE <id>    削除(6秒ほど保留。UNDELETE で取り消し。閉じるときに確定)
 //   PLACE <base64(JSON)>           出す位置を聞く {sig, screens:[{x,y,w,h}], win:{w,h}, center:{x,y}}
 //   STATE <base64(JSON)>           位置・大きさ・展開状態を保存 {x, y, sig, w, h, expanded, mini, mx, my, miniTop}
 //                                  (x,y が null=中央に出す / w,h が null=元の大きさ / mini=ミニ表示か、mx,my=ミニの位置)
@@ -11,6 +13,8 @@
 //   OK <id> / ERR <id>
 //   ADDED <req> <base64(JSON 一覧の1行)> / ADDERR <req> <理由コード>
 //   PLACE <base64(JSON)>           出す位置と前回の状態 {x, y, centered, w, h, expanded, mini, mx, my, miniTop}
+//   EDITED <req> <base64(一覧の1行)> / EDITERR <req> <gone|empty|too-long|bad-due|note-too-long|bad-label|save>
+//   DELERR <id>                    保留が終わって削除を確定しようとしたが失敗 / UNDOERR <id>  取り消しが間に合わなかった
 //   EXPANDTO <x> <y>               ミニから戻すときの位置
 //   RELOAD <base64(view)> / OPEN normal|keep   2つ目の起動からの「開いて」(定時は最新の一覧で通常表示に戻す)
 /** アプリ本体 src/core/logic.ts の TITLE_MAX と同じ */
@@ -36,6 +40,11 @@ export function parseLine(line) {
     const input = decodeB64Json(b);
     return input && typeof input === "object" ? { type: "add", req: a, input } : null;
   }
+  if (cmd === "EDIT" && parts.length === 3 && REQ_RE.test(a)) {
+    const input = decodeB64Json(b);
+    return input && typeof input === "object" && typeof input.id === "string" && ID_RE.test(input.id) ? { type: "edit", req: a, input } : null;
+  }
+  if ((cmd === "DELETE" || cmd === "UNDELETE") && parts.length === 2 && ID_RE.test(a)) return { type: cmd === "DELETE" ? "delete" : "undelete", id: a };
   if (cmd === "PLACE" && parts.length === 2) {
     const env = decodeB64Json(a);
     return env && typeof env === "object" ? { type: "place", env } : null;
@@ -84,6 +93,31 @@ export function validateLabel(raw) {
   if (raw == null) return { ok: true, value: "" };
   if (raw === "work" || raw === "private" || raw === "") return { ok: true, value: raw };
   return { ok: false, error: "bad-label" };
+}
+
+/** メモ: 改行をそろえ、末尾の空白を削り、2000字以内(アプリ本体 validateNote と同じ) */
+export const NOTE_MAX_LEN = 2000;
+export function validateNote(raw) {
+  if (raw == null) return { ok: true, value: "" };
+  if (typeof raw !== "string") return { ok: false, error: "bad-note" };
+  const v = raw.replace(/\r\n?/g, "\n").replace(/\s+$/, "");
+  if (v.length > NOTE_MAX_LEN) return { ok: false, error: "note-too-long" };
+  return { ok: true, value: v };
+}
+
+/**
+ * 編集で書く内容(アプリ本体 cleanPatch + updatedAt と同じ)。渡した項目だけ検証して入れる。
+ * done / doneAt / createdAt には触らない。
+ */
+export function editPatch(input, now = Date.now()) {
+  const out = {};
+  if (input?.title !== undefined) { const r = validateTitle(input.title); if (!r.ok) return r; out.title = r.value; }
+  if (input?.due !== undefined) { const r = validateDue(input.due); if (!r.ok) return r; out.due = r.value; }
+  if (input?.note !== undefined) { const r = validateNote(input.note); if (!r.ok) return r; out.note = r.value; }
+  if (input?.label !== undefined) { const r = validateLabel(input.label); if (!r.ok) return r; out.label = r.value; }
+  if (Object.keys(out).length === 0) return { ok: false, error: "empty" };
+  out.updatedAt = Math.floor(now);
+  return { ok: true, value: out };
 }
 
 /** Firestore に書くドキュメント(id はドキュメントID。アプリの toData と同じキー) */

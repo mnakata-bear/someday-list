@@ -73,3 +73,26 @@ assert.equal(nd.title, "エミュで 追加"); assert.equal(nd.due, ""); assert.
 assert.equal(nd.done, false); assert.equal(nd.doneAt, null);
 assert.ok(Number.isInteger(nd.createdAt) && nd.createdAt === nd.updatedAt);
 console.log("OK 4: ダイアログから追加 → 自動ID・アプリと同じ8項目・空白は1つにまとまる");
+
+// 5) ダイアログからの編集(EDIT)と削除(DELETE): 一覧は b(期限切れ)・c(来週)・a(期限なし) の順
+await seed();
+await stats.set({ stampTotal: 7 });
+const { editTask, deleteTask } = await import("../fetch.mjs");
+await assert.rejects(editTask("nope", { title: "x", updatedAt: 1 }), /gone/);
+const before = (await col.doc("b").get()).data();
+const r5 = spawnSync(process.execPath, [join(here, "..", "index.mjs")], {
+  env: { ...process.env, SOMEDAY_PIPE: `someday-emu5-${process.pid}`, SOMEDAY_STATE_DIR: join(process.env.TEMP || ".", "someday-emu-state"),
+    SOMEDAY_SHOT: shot || join(process.env.TEMP || ".", "someday-emu5.png"),
+    SOMEDAY_AUTOEDIT: "0|編集後の題名|2026-12-24|2|新しいメモ|save", SOMEDAY_AUTODELETE: "2" },
+  stdio: "inherit", timeout: 60000,
+});
+assert.equal(r5.status, 0);
+const got5 = Object.fromEntries((await col.get()).docs.map((d) => [d.id, d.data()]));
+assert.equal(got5.a, undefined, "a は削除された(閉じるときに確定)");
+assert.deepEqual(Object.keys(got5.b).sort(), ["createdAt", "done", "doneAt", "due", "label", "note", "title", "updatedAt"]);
+assert.equal(got5.b.title, "編集後の題名"); assert.equal(got5.b.due, "2026-12-24"); assert.equal(got5.b.label, "private"); assert.equal(got5.b.note, "新しいメモ");
+assert.equal(got5.b.done, before.done); assert.equal(got5.b.doneAt, before.doneAt); assert.equal(got5.b.createdAt, before.createdAt);
+assert.ok(Number.isInteger(got5.b.updatedAt) && got5.b.updatedAt > before.updatedAt);
+assert.equal(got5.c.title, "来週", "触っていないタスクはそのまま");
+assert.equal((await stats.get()).data().stampTotal, 7, "編集・削除では stampTotal を変えない");
+console.log("OK 5: ダイアログから編集 → title/due/label/note と updatedAt だけ更新(done/createdAt はそのまま)、削除は閉じるときに確定、stampTotal 変化なし");

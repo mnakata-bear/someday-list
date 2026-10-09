@@ -1,8 +1,8 @@
 ﻿# いつかやること: 通知ウィンドウ「ふきだし」(WPF / PowerShell 5.1)。index.mjs から呼ばれる。見た目は mock-dialog-cute.html の .v2。
 # -Json: 表示内容(index.mjs が作る)  -Icon: ペンギンのアイコン PNG  -Shot: 見た目確認用(画面を PNG 保存して閉じる)
-# 確認用(マウスを動かさずに操作する。-Shot のときはフォーカスを取らない): -AutoMini ミニ表示にする / -AutoSeq "0,1,0" 行のチェックを順に押す / -AutoAdd "タイトル|期限キー|ラベル;..." 追加 / -AutoExpand 「ほか N件」を開く
+# 確認用(マウスを動かさずに操作する。-Shot のときはフォーカスを取らない): -AutoMini ミニ表示にする / -AutoSeq "0,1,0" 行のチェックを順に押す / -AutoAdd "タイトル|期限キー|ラベル;..." 追加 / -AutoExpand 「ほか N件」を開く / -AutoEdit "行|タイトル|期限|ラベル(0-2)|メモ" 編集して保存 / -AutoDelete "行" 削除
 # node とは1行プロトコルでやりとりする(詳しくは proto.mjs)。
-param([Parameter(Mandatory)][string]$Json, [string]$Icon, [string]$Shot, [string]$AutoSeq, [string]$AutoAdd, [switch]$AutoExpand, [switch]$AutoMini)
+param([Parameter(Mandatory)][string]$Json, [string]$Icon, [string]$Shot, [string]$AutoSeq, [string]$AutoAdd, [switch]$AutoExpand, [switch]$AutoMini, [string]$AutoEdit, [string]$AutoDelete)
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, System.Drawing, System.Windows.Forms
 Add-Type -Namespace SomedayNotify -Name Win -MemberDefinition @'
@@ -46,8 +46,8 @@ function New-Row($it) {
   $x = @"
 <Grid $ns>
   <Grid x:Name='sep' Height='2' ClipToBounds='True' VerticalAlignment='Top'><Line X1='0' Y1='1' X2='1600' Y2='1' Stroke='$dot' StrokeThickness='2' StrokeDashArray='0.1 2' StrokeDashCap='Round'/></Grid>
-  <Grid Margin='2,6,6,6'>
-    <Grid.ColumnDefinitions><ColumnDefinition Width='44'/><ColumnDefinition Width='*'/><ColumnDefinition Width='Auto' MinWidth='52'/></Grid.ColumnDefinitions>
+  <Grid x:Name='nm' Margin='2,6,2,6'>
+    <Grid.ColumnDefinitions><ColumnDefinition Width='44'/><ColumnDefinition Width='*'/><ColumnDefinition Width='Auto' MinWidth='52'/><ColumnDefinition Width='Auto'/></Grid.ColumnDefinitions>
     <Border x:Name='c' Width='44' Height='44' Background='Transparent' Cursor='Hand' ToolTip='押すと完了(もう一度で元に戻す)' VerticalAlignment='Center'>
       <Grid Width='24' Height='24'>
         <Ellipse x:Name='cr' Stroke='$ring' StrokeThickness='2' Fill='White'/>
@@ -70,7 +70,16 @@ function New-Row($it) {
         <TextBlock Text='済' FontFamily='Yu Mincho, MS Mincho' FontSize='19' FontWeight='Bold' Foreground='$stampC' HorizontalAlignment='Center' VerticalAlignment='Center'/>
       </Grid>
     </Grid>
+    <StackPanel x:Name='ib' Grid.Column='3' Orientation='Horizontal' VerticalAlignment='Center' Opacity='0.38'>
+      <Border x:Name='ed' Width='30' Height='44' Background='Transparent' Cursor='Hand' ToolTip='編集'>
+        <Path Width='16' Height='16' Stretch='Uniform' Stroke='$mute' StrokeThickness='1.7' StrokeLineJoin='Round' StrokeStartLineCap='Round' StrokeEndLineCap='Round' Data='M3,13 L3.7,10 L11,2.7 L13.3,5 L6,12.3 Z M9.6,4.1 L11.9,6.4'/>
+      </Border>
+      <Border x:Name='del' Width='30' Height='44' Background='Transparent' Cursor='Hand' ToolTip='削除'>
+        <Path Width='16' Height='16' Stretch='Uniform' Stroke='$mute' StrokeThickness='1.7' StrokeLineJoin='Round' StrokeStartLineCap='Round' StrokeEndLineCap='Round' Data='M2.5,4.5 H13.5 M6,4.5 V2.8 H10 V4.5 M4,4.5 L4.8,13.2 H11.2 L12,4.5 M6.8,7 V11 M9.2,7 V11'/>
+      </Border>
+    </StackPanel>
   </Grid>
+  <Grid x:Name='eh' Margin='2,8,2,8' Visibility='Collapsed'/>
 </Grid>
 "@
   $el = [Windows.Markup.XamlReader]::Parse($x)
@@ -79,7 +88,15 @@ function New-Row($it) {
   $l = $el.FindName('l'); if ($l) { $l.Text = $it.label }
   $c = $el.FindName('c'); $c.Tag = [string]$it.id
   $c.Add_PreviewMouseLeftButtonDown({ param($s, $e) $e.Handled = $true; Toggle-Row ([string]$s.Tag) })
-  @{ id = [string]$it.id; key = [string]$it.key; over = $over; done = $false; pending = $false; el = $el
+  $b1 = $el.FindName('ed'); $b1.Tag = [string]$it.id
+  $b1.Add_PreviewMouseLeftButtonDown({ param($s, $e) $e.Handled = $true; Open-Edit ([string]$s.Tag) })
+  $b2 = $el.FindName('del'); $b2.Tag = [string]$it.id
+  $b2.Add_PreviewMouseLeftButtonDown({ param($s, $e) $e.Handled = $true; Delete-Row ([string]$s.Tag) })
+  # 編集・削除のアイコンは、行にマウスを乗せると濃くなる
+  $el.Add_MouseEnter({ param($s, $e) $s.FindName('ib').Opacity = 0.95 })
+  $el.Add_MouseLeave({ param($s, $e) $s.FindName('ib').Opacity = 0.38 })
+  @{ id = [string]$it.id; key = [string]$it.key; over = $over; done = $false; pending = $false; deleted = $false; el = $el
+     nm = $el.FindName('nm'); eh = $el.FindName('eh'); dueYmd = [string]$it.dueYmd; note = [string]$it.note; labelKey = [string]$it.labelKey; ca = $it.ca; titleRaw = [string]$it.title
      ring = $el.FindName('cr'); ck = $el.FindName('ck'); stamp = $el.FindName('s'); tx = $el.FindName('tx')
      title = $el.FindName('t'); seal = $el.FindName('g'); sep = $el.FindName('sep') }
 }
@@ -136,6 +153,15 @@ if ($v.kind -eq 'error') {
         </ControlTemplate></Thumb.Template>
       </Thumb>
     </Grid>
+  </StackPanel>
+</Border>
+<Border x:Name='toast' Margin='0,12,0,0' CornerRadius='18' Background='#EE2E2A4A' Padding='16,7,7,7' Visibility='Collapsed' HorizontalAlignment='Left'>
+  <Border.Effect><DropShadowEffect BlurRadius='18' ShadowDepth='6' Direction='270' Opacity='0.35' Color='#281E64'/></Border.Effect>
+  <StackPanel Orientation='Horizontal'>
+    <TextBlock x:Name='toastT' Text='削除しました' Foreground='White' FontSize='13' FontWeight='ExtraBold' VerticalAlignment='Center'/>
+    <Border x:Name='toastUndo' Margin='14,0,0,0' CornerRadius='14' Background='#8A6FE0' Padding='13,6' Cursor='Hand' ToolTip='削除を取り消す'>
+      <TextBlock Text='元に戻す' Foreground='White' FontSize='12.5' FontWeight='ExtraBold'/>
+    </Border>
   </StackPanel>
 </Border>
 <Border x:Name='addB' Margin='0,12,0,0' CornerRadius='22,22,22,8' Background='#F7FFFFFF' Padding='14,12,14,12' Visibility='Collapsed'>
@@ -303,7 +329,7 @@ $script:limit = [int]$v.limit; if ($script:limit -le 0) { $script:limit = 5 }
 $script:expanded = [bool]$v.expanded
 $script:hasPos = $false
 $script:userW = $null; $script:userH = $null
-$script:titleMax = 236
+$script:titleMax = 216
 $script:mini = $false; $script:miniTop = $true; $script:mx = $null; $script:my = $null
 $script:nx = $null; $script:ny = $null
 $script:addWasOpen = $false
@@ -311,10 +337,10 @@ $script:quiet = [bool]$Shot   # 撮影(確認用)のときはフォーカスを�
 $script:labIdx = 0
 
 function Update-Say {
-  $doneN = @($script:rows | Where-Object { $_.done }).Count
-  $overDone = @($script:rows | Where-Object { $_.done -and $_.over }).Count
-  $left = $script:total - $doneN
-  $overLeft = $script:overdueTotal - $overDone
+  # のこり件数: 完了にした行・削除した行は数えない
+  $live = @($script:rows | Where-Object { -not $_.deleted -and -not $_.done })
+  $left = $live.Count
+  $overLeft = @($live | Where-Object { $_.over }).Count
   $s1 = $w.FindName('say1'); $s2 = $w.FindName('say2'); $s3 = $w.FindName('say3')
   if ($left -le 0) {
     $s1.Text = if ($script:anyChange) { 'ぜんぶ終わったね！' } else { 'ぜんぶ終わってるよ！' }
@@ -324,7 +350,7 @@ function Update-Say {
     $s2.Visibility = 'Visible'; $s2.Text = "のこり $($left)件だよ"
     if ($overLeft -gt 0) { $s3.Visibility = 'Visible'; $s3.Text = "期限切れが $($overLeft)件あるよ" } else { $s3.Visibility = 'Collapsed' }
   }
-  if (-not $script:mini) { $w.FindName('listB').Visibility = if ($script:rows.Count -gt 0) { 'Visible' } else { 'Collapsed' } }
+  if (-not $script:mini) { $w.FindName('listB').Visibility = if (@($script:rows | Where-Object { -not $_.deleted }).Count -gt 0) { 'Visible' } else { 'Collapsed' } }
   # ミニ表示のバッジ(のこり件数。期限切れがあれば赤、なければ紫)
   $w.FindName('badgeT').Text = if ($left -gt 99) { '99+' } else { [string][Math]::Max(0, $left) }
   $w.FindName('badge').Background = New-Object Windows.Media.SolidColorBrush([Windows.Media.ColorConverter]::ConvertFromString($(if ($overLeft -gt 0) { $red } else { $purple })))
@@ -530,17 +556,19 @@ function Save-State {
 
 # ---------- 展開/たたむ・大きさ ----------
 function Apply-Rows([bool]$animate) {
-  for ($i = 0; $i -lt $script:rows.Count; $i++) {
-    $r = $script:rows[$i]
-    $show = $script:expanded -or $i -lt $script:limit
+  $vis = 0
+  foreach ($r in $script:rows) {
+    if ($r.deleted) { $r.el.Visibility = 'Collapsed'; continue }
+    $show = $script:expanded -or $vis -lt $script:limit
+    $vis++
     if ($show -and $r.el.Visibility -ne 'Visible') {
       $r.el.Visibility = 'Visible'
       if ($animate) { $r.el.BeginAnimation([Windows.UIElement]::OpacityProperty, (New-Object Windows.Media.Animation.DoubleAnimation(0, 1, [TimeSpan]::FromMilliseconds(300)))) }
     } elseif (-not $show) { $r.el.Visibility = 'Collapsed' }
   }
-  $hidden = [Math]::Max(0, $script:rows.Count - $script:limit)
+  $hidden = [Math]::Max(0, $vis - $script:limit)
   $mb = $w.FindName('moreB')
-  if ($hidden -le 0) { $mb.Visibility = 'Collapsed' }
+  if ($hidden -le 0 -and -not ($script:expanded -and $vis -gt $script:limit)) { $mb.Visibility = 'Collapsed' }
   else {
     $mb.Visibility = 'Visible'
     $w.FindName('more').Text = if ($script:expanded) { 'たたむ ▴' } else { "すべて見る(あと $($hidden)件) ▾" }
@@ -557,7 +585,7 @@ function Toggle-Expand {
 function Set-ListWidth([double]$rw) {
   $w.FindName('root').Width = $rw
   $w.Width = $rw + 48
-  $script:titleMax = [int]($rw - 194)
+  $script:titleMax = [int]($rw - 214)
   foreach ($r in $script:rows) { $r.title.MaxWidth = $script:titleMax }
 }
 # 一覧部分の高さの上限(ウィンドウが画面の高さに収まるように)
@@ -580,6 +608,230 @@ function Reset-Size {
   $w.FindName('sv').ScrollToTop()
   Apply-Size
   Save-State
+}
+
+# ---------- 編集(行の中で、「追加」と同じ部品で) ----------
+$script:ef = $null
+$script:editing = $null
+$script:edits = @{}
+$script:eLab = 0
+$script:editSeq = 0
+function Build-EditForm {
+  $chips = ''
+  for ($i = 0; $i -lt $v.chips.Count; $i++) {
+    $chips += "<Border x:Name='echip$i' Tag='$i' CornerRadius='12' Padding='11,4' Margin='0,0,6,6' Cursor='Hand'><TextBlock x:Name='echipT$i' FontSize='12' FontWeight='ExtraBold'/></Border>"
+  }
+  $labs = ''
+  $defs = @(@('なし', '#9C93B8'), @('仕事', $purple), @('プライベート', $pink))
+  for ($i = 0; $i -lt 3; $i++) {
+    $c = $defs[$i][1]
+    $labs += @"
+<Grid x:Name='elab$i' Tag='$i' Margin='2,0,10,6' Cursor='Hand' Background='Transparent' RenderTransformOrigin='0.5,0.5'>
+  <Grid.RenderTransform><RotateTransform Angle='-6'/></Grid.RenderTransform>
+  <Border x:Name='elabB$i' BorderBrush='$c' BorderThickness='1.5' CornerRadius='8' Padding='9,3'><TextBlock Text='$($defs[$i][0])' FontSize='11' FontWeight='ExtraBold' Foreground='$c'/></Border>
+  <Rectangle Margin='2.5' RadiusX='5' RadiusY='5' Stroke='$c' StrokeThickness='1' StrokeDashArray='3 2' Opacity='0.55' IsHitTestVisible='False'/>
+</Grid>
+"@
+  }
+  $x = @"
+<Border $ns CornerRadius='16' Background='#F7F4FE' BorderBrush='#E3DAF8' BorderThickness='1' Padding='12,10,12,8'>
+  <StackPanel>
+    <Border CornerRadius='12' Background='White' BorderBrush='#E3DAF8' BorderThickness='1'>
+      <TextBox x:Name='etitle' BorderThickness='0' Background='Transparent' Padding='10,8' FontSize='14' FontWeight='Bold' Foreground='$ink' MaxLength='300' VerticalContentAlignment='Center'/>
+    </Border>
+    <WrapPanel Margin='0,10,0,0'>
+      <TextBlock Text='期限' FontSize='11.5' FontWeight='ExtraBold' Foreground='$mute' VerticalAlignment='Top' Margin='2,4,8,0'/>
+      $chips
+    </WrapPanel>
+    <StackPanel Orientation='Horizontal' Margin='0,0,0,8'>
+      <TextBlock Text='日付' FontSize='11.5' FontWeight='ExtraBold' Foreground='$mute' VerticalAlignment='Center' Margin='2,0,8,0'/>
+      <Border CornerRadius='10' Background='White' BorderBrush='#E3DAF8' BorderThickness='1' Width='132'>
+        <Grid>
+          <TextBox x:Name='edue' BorderThickness='0' Background='Transparent' Padding='9,5' FontSize='13' FontWeight='Bold' Foreground='$ink' MaxLength='10'/>
+          <TextBlock x:Name='eduePh' Text='2026-11-30' Margin='11,0,0,0' VerticalAlignment='Center' FontSize='13' Foreground='#B5ABD0' IsHitTestVisible='False'/>
+        </Grid>
+      </Border>
+      <TextBlock x:Name='edueNow' FontSize='11.5' FontWeight='Bold' Foreground='$mute' VerticalAlignment='Center' Margin='10,0,0,0'/>
+    </StackPanel>
+    <WrapPanel>
+      <TextBlock Text='ラベル' FontSize='11.5' FontWeight='ExtraBold' Foreground='$mute' VerticalAlignment='Top' Margin='2,4,8,0'/>
+      $labs
+    </WrapPanel>
+    <Border CornerRadius='12' Background='White' BorderBrush='#E3DAF8' BorderThickness='1' Margin='0,2,0,0'>
+      <Grid>
+        <TextBox x:Name='enote' BorderThickness='0' Background='Transparent' Padding='10,8' FontSize='13' Foreground='$ink' MaxLength='2000' AcceptsReturn='True' TextWrapping='Wrap' MinHeight='62' MaxHeight='140' VerticalScrollBarVisibility='Auto'/>
+        <TextBlock x:Name='enotePh' Text='メモ(任意)' Margin='12,9,0,0' VerticalAlignment='Top' FontSize='13' Foreground='#B5ABD0' IsHitTestVisible='False'/>
+      </Grid>
+    </Border>
+    <TextBlock x:Name='eerr' Margin='2,6,0,0' FontSize='12.5' FontWeight='ExtraBold' Foreground='$red' Visibility='Collapsed' TextWrapping='Wrap'/>
+    <StackPanel Orientation='Horizontal' HorizontalAlignment='Right' Margin='0,8,0,0'>
+      <Button x:Name='ecancel' Style='{DynamicResource Ghost}' Height='40' MinWidth='80' Content='やめる' ToolTip='やめる (Esc)'/>
+      <Button x:Name='esave' Style='{DynamicResource Primary}' Height='40' Content='保存' Margin='8,0,0,0' ToolTip='保存 (Enter)'/>
+    </StackPanel>
+  </StackPanel>
+</Border>
+"@
+  $f = [Windows.Markup.XamlReader]::Parse($x)
+  for ($i = 0; $i -lt $v.chips.Count; $i++) {
+    $f.FindName("echipT$i").Text = $v.chips[$i].label
+    $f.FindName("echip$i").Add_PreviewMouseLeftButtonDown({ param($s, $e) $e.Handled = $true; $f2 = $script:ef; $f2.FindName('edue').Text = [string]$v.chips[[int]$s.Tag].ymd })
+  }
+  for ($i = 0; $i -lt 3; $i++) { $f.FindName("elab$i").Add_PreviewMouseLeftButtonDown({ param($s, $e) $e.Handled = $true; Select-ELabel ([int]$s.Tag) }) }
+  $f.FindName('edue').Add_TextChanged({ Sync-EditChips })
+  $f.FindName('enote').Add_TextChanged({ $f2 = $script:ef; $f2.FindName('enotePh').Visibility = if ($f2.FindName('enote').Text.Length -gt 0) { 'Hidden' } else { 'Visible' } })
+  $f.FindName('etitle').Add_KeyDown({ param($s, $e) if ($e.Key -eq 'Return') { $e.Handled = $true; Do-Edit } })
+  $f.FindName('esave').Add_Click({ Do-Edit })
+  $f.FindName('ecancel').Add_Click({ Close-Edit })
+  $script:ef = $f
+}
+function Sync-EditChips {
+  $f = $script:ef; if (-not $f) { return }
+  $t = $f.FindName('edue').Text.Trim()
+  $f.FindName('eduePh').Visibility = if ($t.Length -gt 0) { 'Hidden' } else { 'Visible' }
+  for ($i = 0; $i -lt $v.chips.Count; $i++) {
+    $on = ($t -eq [string]$v.chips[$i].ymd)
+    $f.FindName("echip$i").Background = New-Object Windows.Media.SolidColorBrush([Windows.Media.ColorConverter]::ConvertFromString($(if ($on) { $purple } else { '#EDE7FB' })))
+    $f.FindName("echipT$i").Foreground = if ($on) { [Windows.Media.Brushes]::White } else { New-Object Windows.Media.SolidColorBrush([Windows.Media.ColorConverter]::ConvertFromString('#6B5BB0')) }
+  }
+}
+function Select-ELabel([int]$i) {
+  $script:eLab = $i
+  for ($k = 0; $k -lt 3; $k++) {
+    $g = $script:ef.FindName("elab$k"); $b = $script:ef.FindName("elabB$k")
+    if ($k -eq $i) { $g.Opacity = 1; $b.Background = New-Object Windows.Media.SolidColorBrush([Windows.Media.ColorConverter]::ConvertFromString('#F4EFFD')) }
+    else { $g.Opacity = 0.4; $b.Background = [Windows.Media.Brushes]::Transparent }
+  }
+}
+function Edit-Error([string]$msg) {
+  $e = $script:ef.FindName('eerr')
+  if ($msg) { $e.Text = $msg; $e.Visibility = 'Visible' } else { $e.Visibility = 'Collapsed' }
+}
+function Open-Edit([string]$id) {
+  $r = Find-Row $id
+  if (-not $r -or $r.pending -or $r.deleted) { return }
+  if ($script:editing -and $script:editing.id -eq $id) { return }
+  Close-Edit
+  if (-not $script:ef) { Build-EditForm }
+  $f = $script:ef
+  $f.FindName('etitle').Text = $r.titleRaw
+  $f.FindName('edue').Text = $r.dueYmd
+  $f.FindName('edueNow').Text = if ($r.dueYmd) { "いまの期限 $($r.dueYmd)" } else { 'いまは期限なし' }
+  $f.FindName('enote').Text = $r.note
+  $f.FindName('enotePh').Visibility = if ($r.note.Length -gt 0) { 'Hidden' } else { 'Visible' }
+  Select-ELabel $(if ($r.labelKey -eq 'work') { 1 } elseif ($r.labelKey -eq 'private') { 2 } else { 0 })
+  Edit-Error ''
+  $f.FindName('esave').IsEnabled = $true; $f.FindName('etitle').IsReadOnly = $false
+  Sync-EditChips
+  $r.nm.Visibility = 'Collapsed'; $r.eh.Visibility = 'Visible'
+  $r.eh.Children.Add($f) | Out-Null
+  $script:editing = $r
+  $f.BeginAnimation([Windows.UIElement]::OpacityProperty, (New-Object Windows.Media.Animation.DoubleAnimation(0, 1, [TimeSpan]::FromMilliseconds(240))))
+  $r.el.BringIntoView()
+  if (-not $script:quiet) {
+    $w.Activate() | Out-Null
+    $null = $w.Dispatcher.BeginInvoke([Action]{ $t = $script:ef.FindName('etitle'); $t.Focus() | Out-Null; [Windows.Input.Keyboard]::Focus($t) | Out-Null; $t.SelectAll() }, [Windows.Threading.DispatcherPriority]::Input)
+  }
+}
+function Close-Edit {
+  $r = $script:editing
+  if (-not $r) { return }
+  $script:editing = $null
+  $r.eh.Children.Clear()
+  $r.eh.Visibility = 'Collapsed'; $r.nm.Visibility = 'Visible'
+}
+function Do-Edit {
+  $r = $script:editing; if (-not $r) { return }
+  $f = $script:ef
+  $title = ($f.FindName('etitle').Text -replace '\s+', ' ').Trim()
+  if (-not $title) { $f.FindName('etitle').Focus() | Out-Null; return }
+  if ([Globalization.StringInfo]::new($title).LengthInTextElements -gt 100) { Edit-Error '100文字以内にしてね'; return }
+  $labels = @('', 'work', 'private')
+  $script:editSeq++
+  $req = "e$($script:editSeq)"
+  $script:edits[$req] = $r.id
+  $f.FindName('esave').IsEnabled = $false; $f.FindName('etitle').IsReadOnly = $true
+  Edit-Error ''; Say-Error ''
+  Send ("EDIT $req " + (To-B64 @{ id = $r.id; title = $title; due = $f.FindName('edue').Text.Trim(); note = $f.FindName('enote').Text; label = $labels[$script:eLab]; ca = $r.ca }))
+}
+function On-Edited([string]$req, $item) {
+  if (-not $script:edits.ContainsKey($req)) { return }
+  $id = $script:edits[$req]; $script:edits.Remove($req)
+  $old = Find-Row $id
+  if (-not $old) { return }
+  if ($script:editing -and $script:editing.id -eq $id) { Close-Edit }
+  $nr = New-Row $item
+  $nr.done = $old.done
+  if ($old.done) { Set-RowLook $nr $true $false }
+  $w.FindName('listP').Children.Remove($old.el)
+  $script:rows.Remove($old)
+  Insert-Row $nr $true
+  Update-Say
+}
+function On-EditErr([string]$req, [string]$why) {
+  if (-not $script:edits.ContainsKey($req)) { return }
+  $id = $script:edits[$req]; $script:edits.Remove($req)
+  $f = $script:ef
+  if ($f) { $f.FindName('esave').IsEnabled = $true; $f.FindName('etitle').IsReadOnly = $false }
+  switch ($why) {
+    'gone' {
+      # 他の端末で消された: 行を片づける
+      $old = Find-Row $id
+      if ($old) { if ($script:editing -and $script:editing.id -eq $id) { Close-Edit }; $old.deleted = $true; Apply-Rows $false; Update-Say }
+      Say-Error 'もう無いよ(他の端末で消されたみたい)'
+    }
+    'too-long' { Edit-Error '100文字以内にしてね' }
+    'note-too-long' { Edit-Error 'メモは2000文字以内にしてね' }
+    'bad-due' { Edit-Error '日付が正しくないよ(例 2026-11-30)' }
+    'empty' { Edit-Error 'やることを入力してね' }
+    default { Edit-Error '保存できなかったよ…もう一度ためしてね'; Say-Error '保存できなかったよ…もう一度ためしてね' }
+  }
+}
+
+# ---------- 削除(約6秒は「元に戻す」できる。確定は node 側で、6秒後かダイアログを閉じるとき) ----------
+$script:toastTimer = $null
+$script:toastId = $null
+function Show-Toast([string]$id) {
+  $script:toastId = $id
+  $t = $w.FindName('toast')
+  $t.Visibility = 'Visible'
+  $t.BeginAnimation([Windows.UIElement]::OpacityProperty, (New-Object Windows.Media.Animation.DoubleAnimation(0, 1, [TimeSpan]::FromMilliseconds(220))))
+  if ($script:toastTimer) { $script:toastTimer.Stop() }
+  $script:toastTimer = New-Object Windows.Threading.DispatcherTimer
+  $script:toastTimer.Interval = [TimeSpan]::FromSeconds(6)
+  $script:toastTimer.Add_Tick({ $script:toastTimer.Stop(); $w.FindName('toast').Visibility = 'Collapsed'; $script:toastId = $null })
+  $script:toastTimer.Start()
+}
+function Hide-Toast { if ($script:toastTimer) { $script:toastTimer.Stop() }; $w.FindName('toast').Visibility = 'Collapsed'; $script:toastId = $null }
+function Delete-Row([string]$id) {
+  $r = Find-Row $id
+  if (-not $r -or $r.deleted) { return }
+  if ($script:editing -and $script:editing.id -eq $id) { Close-Edit }
+  $r.deleted = $true
+  $script:anyChange = $true
+  $an = New-Object Windows.Media.Animation.DoubleAnimation(1, 0.15, [TimeSpan]::FromMilliseconds(220))
+  $an.Add_Completed({ Apply-Rows $false })
+  $r.el.BeginAnimation([Windows.UIElement]::OpacityProperty, $an)
+  Update-Say
+  Say-Error ''
+  Send "DELETE $id"
+  Show-Toast $id
+}
+function Restore-Row($r) {
+  $r.deleted = $false
+  $r.el.BeginAnimation([Windows.UIElement]::OpacityProperty, $null)
+  $r.el.Opacity = 1
+  $r.el.Visibility = 'Visible'
+  Apply-Rows $true
+  Update-Say
+}
+function Undo-Delete {
+  $id = $script:toastId
+  if (-not $id) { return }
+  $r = Find-Row $id
+  Hide-Toast
+  if (-not $r -or -not $r.deleted) { return }
+  Send "UNDELETE $id"
+  Restore-Row $r
 }
 
 # ---------- ミニ表示(ペンギンの顔だけ) ----------
@@ -661,6 +913,7 @@ function Bring-Front {
 # 2つ目の起動(定時)から届いた最新の一覧に入れ替える
 function Load-View($nv) {
   $script:v = $nv
+  Close-Edit
   $script:rows.Clear(); $w.FindName('listP').Children.Clear()
   $script:total = [int]$nv.total; $script:overdueTotal = [int]$nv.overdue; $script:anyChange = $false
   foreach ($it in @($nv.items) + @($nv.rest)) { if ($it) { $r = New-Row $it; [void]$script:rows.Add($r); $w.FindName('listP').Children.Add($r.el) | Out-Null } }
@@ -687,6 +940,19 @@ function On-Reply([string]$line) {
     }
     'ADDED' { try { On-Added $p[1] (From-B64 $p[2]) } catch { On-AddErr $p[1] 'save' } }
     'ADDERR' { On-AddErr $p[1] $p[2] }
+    'EDITED' { try { On-Edited $p[1] (From-B64 $p[2]) } catch { On-EditErr $p[1] 'save' } }
+    'EDITERR' { On-EditErr $p[1] $p[2] }
+    'DELERR' {
+      # 削除を確定できなかった: 行を元に戻す
+      $r = Find-Row $p[1]
+      if ($r -and $r.deleted) { Restore-Row $r; Say-Error '削除できなかったよ…もう一度ためしてね' }
+    }
+    'UNDOERR' {
+      # 取り消しが間に合わなかった(すでに削除された)
+      $r = Find-Row $p[1]
+      if ($r -and -not $r.deleted) { $r.deleted = $true; Apply-Rows $false; Update-Say }
+      Say-Error 'もう消えちゃってたよ'
+    }
     'PLACE' {
       if (-not $script:placed) {
         $pl = From-B64 $p[1]
@@ -754,6 +1020,7 @@ if ($v.kind -eq 'error') {
   $w.FindName('addBtn').Add_Click({ Do-Add })
   $w.FindName('cancelBtn').Add_Click({ Close-AddForm })
   $w.FindName('plusBtn').Add_Click({ Open-AddForm })
+  $w.FindName('toastUndo').Add_PreviewMouseLeftButtonDown({ param($s, $e) $e.Handled = $true; Undo-Delete })
 }
 
 
@@ -780,6 +1047,7 @@ if ($script:quiet) { $w.ShowActivated = $false }
 $w.Add_PreviewKeyDown({ param($s, $e)
   if ($e.Key -ne 'Escape') { return }
   $inp = $w.FindName('inp')
+  if ($script:editing) { Close-Edit; $e.Handled = $true; return }
   $f = $w.FindName('addB')
   if ($f -and $f.Visibility -eq 'Visible') { Close-AddForm; $e.Handled = $true; return }
   $s.Close() })
@@ -841,6 +1109,14 @@ $w.Add_Loaded({
       $script:auto.Enqueue([scriptblock]::Create("`$w.FindName('inp').Text = '$($f[0] -replace "'", "''")'; Select-Chip $([int]$f[1]); Select-Label $([int]$f[2]); Do-Add"))
     }
   }
+  if ($AutoEdit) {
+    foreach ($a in ($AutoEdit -split ';')) {
+      $f = $a -split '\|'
+      $script:auto.Enqueue([scriptblock]::Create("`$r = `$script:rows[$([int]$f[0])]; Open-Edit `$r.id; `$ff = `$script:ef; `$ff.FindName('etitle').Text = '$($f[1] -replace "'", "''")'; `$ff.FindName('edue').Text = '$($f[2])'; Select-ELabel $([int]$f[3]); `$ff.FindName('enote').Text = '$($f[4] -replace "'", "''")'"))
+      if ($f.Count -ge 6 -and $f[5] -eq 'save') { $script:auto.Enqueue({ Do-Edit }) }
+    }
+  }
+  if ($AutoDelete) { foreach ($a in ($AutoDelete -split ',')) { $script:auto.Enqueue([scriptblock]::Create("Delete-Row `$script:rows[$([int]$a)].id")) } }
   if ($AutoSeq) { foreach ($s in ($AutoSeq -split ',')) { $script:auto.Enqueue([scriptblock]::Create("Toggle-Row `$script:rows[$([int]$s)].id")) } }
   $delay = 1200 + 900 * $script:auto.Count
   if ($script:auto.Count -gt 0) {

@@ -59,6 +59,10 @@ export function itemView(t, now = new Date()) {
   return {
     id: String(t.id),
     key: sortKey(t),
+    ca: Math.max(0, ms(t.createdAt)),
+    done: !!t.done,
+    dueYmd: t.due || "",
+    note: typeof t.note === "string" ? t.note : "",
     title: t.title || "(無題)",
     due: di.txt,
     dueCls: di.cls,

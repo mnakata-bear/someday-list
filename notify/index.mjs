@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildView, demoTasks, MAX_ITEMS } from "./logic.mjs";
-import { fetchPendingTasks, setDone, addTask, KeyMissingError, DEFAULT_KEY } from "./fetch.mjs";
+import { fetchPendingTasks, setDone, addTask, editTask, deleteTask, KeyMissingError, DEFAULT_KEY } from "./fetch.mjs";
 import { makeHandler } from "./handler.mjs";
 import { acquireInstance, sendToPrimary, defaultPipeName } from "./instance.mjs";
 import { encodeB64Json } from "./proto.mjs";
@@ -67,9 +67,12 @@ if (process.env.SOMEDAY_AUTOSEQ) psArgs.push("-AutoSeq", process.env.SOMEDAY_AUT
 if (process.env.SOMEDAY_AUTOADD) psArgs.push("-AutoAdd", process.env.SOMEDAY_AUTOADD);
 if (process.env.SOMEDAY_AUTOEXPAND) psArgs.push("-AutoExpand");
 if (process.env.SOMEDAY_AUTOMINI) psArgs.push("-AutoMini");
+if (process.env.SOMEDAY_AUTOEDIT) psArgs.push("-AutoEdit", process.env.SOMEDAY_AUTOEDIT);
+if (process.env.SOMEDAY_AUTODELETE) psArgs.push("-AutoDelete", process.env.SOMEDAY_AUTODELETE);
 // show.ps1 とは1行プロトコルでやりとりする(proto.mjs)。--demo は Firestore に書き込まない
 const handle = makeHandler({
-  demo: args.has("--demo"), manual, setDone, addTask, loadPos, savePos,
+  demo: args.has("--demo"), manual, setDone, addTask, editTask, deleteTask, loadPos, savePos,
+  push: (l) => reply(l),
   now: () => Date.now(), log: (s) => console.error(s),
 });
 const ps = spawn("powershell.exe", psArgs, { stdio: ["pipe", "pipe", "inherit"], windowsHide: true });
@@ -94,7 +97,9 @@ onOpen = (line) => {
   });
 };
 const code = await new Promise((res) => ps.on("close", (c) => res(c ?? 0)));
+await new Promise((r) => setImmediate(r)); // 閉じる直前に届いた行を処理させる
 await queue;
+await handle.flush(); // 保留中の削除は、閉じるときに確定する
 rmSync(dir, { recursive: true, force: true });
 await inst.close();
 process.exit(code);

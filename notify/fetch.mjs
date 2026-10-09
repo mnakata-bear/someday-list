@@ -69,3 +69,24 @@ export async function addTask(data) {
   await ref.set(data);
   return ref.id;
 }
+
+/**
+ * 編集。対象が無ければ Error("gone")(他の端末で削除された)。更新後のドキュメントを返す。
+ * done / doneAt / createdAt や stampTotal には触らない。
+ */
+export async function editTask(id, patch) {
+  const db = await getDb();
+  const ref = tasksCol(db).doc(id);
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) throw new Error("gone");
+    tx.update(ref, patch);
+    return { ...snap.data(), ...patch };
+  });
+}
+
+/** 削除(stampTotal は変えない。完了済みだった分もそのまま) */
+export async function deleteTask(id) {
+  const db = await getDb();
+  await tasksCol(db).doc(id).delete();
+}

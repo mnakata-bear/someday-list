@@ -1,18 +1,26 @@
 // show.ps1 から届いた1行を処理して、返事の1行を返す(返事が要らなければ null)
-import { parseLine, newTaskData, placeReply, expandPosition, encodeB64Json } from "./proto.mjs";
+import { parseLine, newTaskData, editPatch, placeReply, expandPosition, encodeB64Json } from "./proto.mjs";
+import { createDeferred } from "./pending.mjs";
 import { itemView } from "./logic.mjs";
 
 /**
  * @param {object} deps
  *   demo: true なら Firestore に書かない(見た目だけ)
- *   setDone(id, done), addTask(data) → id   Firestore 書き込み
+ *   setDone(id, done), addTask(data) → id, editTask(id, patch) → 更新後の文書, deleteTask(id)   Firestore 書き込み
+ *   push(line): 非同期に window へ送る(削除の確定に失敗したとき)
+ *   holdMs: 削除を保留する時間(既定 6000)
  *   loadPos(), savePos(state)               位置・大きさの保存
  *   manual: 手動(タスクバー)で開いた(前回のミニ表示を引き継ぐ)
  *   now(): ms
  */
 export function makeHandler(deps) {
   let demoSeq = 0;
-  return async function handle(line) {
+  const deferred = createDeferred({
+    delayMs: deps.holdMs ?? 6000,
+    commit: async (id) => { if (!deps.demo) await deps.deleteTask(id); },
+    onError: (id, e) => { deps.log?.(`削除に失敗: ${id} ${e?.message ?? e}`); deps.push?.(`DELERR ${id}`); },
+  });
+  async function handle(line) {
     const cmd = parseLine(line);
     if (!cmd) return null;
     if (cmd.type === "done") {
@@ -36,6 +44,23 @@ export function makeHandler(deps) {
         return `ADDERR ${cmd.req} save`;
       }
     }
+    if (cmd.type === "edit") {
+      const now = deps.now();
+      const r = editPatch(cmd.input, now);
+      if (!r.ok) return `EDITERR ${cmd.req} ${r.error}`;
+      try {
+        // --demo は書き込まず、渡された値(ca=作成日時)で組み立てる
+        const doc = deps.demo ? { createdAt: cmd.input.ca ?? 0, done: false, ...r.value } : await deps.editTask(cmd.input.id, r.value);
+        const merged = deps.demo ? { title: cmd.input.title, due: cmd.input.due ?? "", note: cmd.input.note ?? "", label: cmd.input.label ?? "", ...doc } : doc;
+        return `EDITED ${cmd.req} ${encodeB64Json(itemView({ id: cmd.input.id, ...merged }, new Date(now)))}`;
+      } catch (e) {
+        if (e?.message === "gone") return `EDITERR ${cmd.req} gone`;
+        deps.log?.(`編集に失敗: ${e?.message ?? e}`);
+        return `EDITERR ${cmd.req} save`;
+      }
+    }
+    if (cmd.type === "delete") { deferred.schedule(cmd.id); return null; }
+    if (cmd.type === "undelete") return deferred.undo(cmd.id) ? null : `UNDOERR ${cmd.id}`;
     if (cmd.type === "place") {
       if (process.env.SOMEDAY_DEBUG) deps.log?.(`[place] sig=${cmd.env.sig} center=${JSON.stringify(cmd.env.center)} win=${JSON.stringify(cmd.env.win)}`);
       return placeReply(deps.loadPos(), cmd.env, { manual: !!deps.manual });
@@ -49,5 +74,8 @@ export function makeHandler(deps) {
       return null;
     }
     return null;
-  };
+  }
+  handle.flush = () => deferred.flush();
+  handle.deferred = deferred;
+  return handle;
 }
