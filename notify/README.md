@@ -54,3 +54,13 @@
 - 表示されない: `node index.mjs --demo` で出るか確認。タスクから起動したときの出力は `%TEMP%\someday-notify.log` に残ります。タスクの場合は `Get-ScheduledTaskInfo -TaskName SomedayListNotify` で LastTaskResult を見る。
 - `node` が見つからない(タスク実行時): ユーザーの PATH に Node.js があるか確認。
 - 日本語が化ける: `.ps1` は UTF-8 BOM 付きで保存してください(PowerShell 5.1 の仕様)。`run.cmd` と `run-hidden.vbs` は ANSI で読まれるので英数字だけにしています。
+
+## タスクバーから開く
+
+```powershell
+.\make-shortcut.ps1
+```
+
+スタートメニューとデスクトップに「いつかやること」(ペンギンのアイコン)のショートカットを作ります。
+ショートカットを右クリック →「タスクバーにピン留めする」で、画面下のタスクバーからいつでも開けます。
+ダイアログが開いている間は、タスクバーにもペンギンのアイコンで表示されます。

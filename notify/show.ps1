@@ -109,7 +109,7 @@ $xaml = @"
 <Window xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'
         xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'
         Title='いつかやること' Width='478' SizeToContent='Height' WindowStyle='None' AllowsTransparency='True'
-        Background='Transparent' ShowInTaskbar='False' Topmost='True' ResizeMode='NoResize'
+        Background='Transparent' ShowInTaskbar='True' Topmost='True' ResizeMode='NoResize'
         FontFamily='M PLUS Rounded 1c, Meiryo UI, Yu Gothic UI, Segoe UI' UseLayoutRounding='True' TextOptions.TextFormattingMode='Display'>
   <Window.Resources>
     <Style x:Key='Ro' TargetType='TextBox'>
@@ -179,6 +179,9 @@ $xaml = @"
 "@
 
 $w = [Windows.Markup.XamlReader]::Parse($xaml)
+# タスクバーにペンギンのアイコンで表示する
+$ico = Join-Path $PSScriptRoot 'assets\icon.ico'
+if (Test-Path $ico) { try { $w.Icon = [Windows.Media.Imaging.BitmapFrame]::Create((New-Object Uri($ico))) } catch {} }
 $wa = [System.Windows.SystemParameters]::WorkArea
 
 if ($Icon -and (Test-Path $Icon)) {
