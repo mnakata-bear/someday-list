@@ -4,12 +4,15 @@
 //   DONE <id> / UNDONE <id>        完了 / 未完了に戻す
 //   ADD <req> <base64(JSON)>       新規追加 {title, due, label}(req は返事を対応づけるための番号)
 //   PLACE <base64(JSON)>           出す位置を聞く {sig, screens:[{x,y,w,h}], win:{w,h}, center:{x,y}}
-//   STATE <base64(JSON)>           位置・大きさ・展開状態を保存 {x, y, sig, w, h, expanded}
-//                                  (x,y が null=中央に出す / w,h が null=元の大きさ)
+//   STATE <base64(JSON)>           位置・大きさ・展開状態を保存 {x, y, sig, w, h, expanded, mini, mx, my, miniTop}
+//                                  (x,y が null=中央に出す / w,h が null=元の大きさ / mini=ミニ表示か、mx,my=ミニの位置)
+//   EXPAND <base64(JSON)>          ミニから戻すときの位置を聞く {anchor:{x,y}, at:{x,y}, win:{w,h}, screens}
 // node → show.ps1(標準入力)
 //   OK <id> / ERR <id>
 //   ADDED <req> <base64(JSON 一覧の1行)> / ADDERR <req> <理由コード>
-//   PLACE <x> <y> <w|-> <h|-> <0|1> <c|p>  出す位置(c=中央)と、前回の大きさ(-=元のまま)・展開状態
+//   PLACE <base64(JSON)>           出す位置と前回の状態 {x, y, centered, w, h, expanded, mini, mx, my, miniTop}
+//   EXPANDTO <x> <y>               ミニから戻すときの位置
+//   RELOAD <base64(view)> / OPEN normal|keep   2つ目の起動からの「開いて」(定時は最新の一覧で通常表示に戻す)
 /** アプリ本体 src/core/logic.ts の TITLE_MAX と同じ */
 export const TITLE_MAX_LEN = 100;
 
@@ -47,8 +50,13 @@ export function parseLine(line) {
       state: {
         x: x !== null && y !== null ? x : null, y: x !== null && y !== null ? y : null,
         sig: String(p.sig ?? ""), w: num(p.w), h: num(p.h), expanded: p.expanded === true,
+        mini: p.mini === true, mx: num(p.mx), my: num(p.my), miniTop: p.miniTop !== false,
       },
     };
+  }
+  if (cmd === "EXPAND" && parts.length === 2) {
+    const e = decodeB64Json(a);
+    return e && e.anchor && e.win ? { type: "expand", env: e } : null;
   }
   return null;
 }
@@ -110,9 +118,42 @@ export function choosePosition(saved, env) {
   return { x, y, centered: false };
 }
 
-/** PLACE の返事(位置+前回の大きさ・展開状態) */
-export function placeReply(saved, env) {
+const findScreen = (screens, px, py) => (screens || []).find((r) => px >= r.x && px < r.x + r.w && py >= r.y && py < r.y + r.h);
+const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
+
+/** ミニ表示の保存位置が使えるか。モニター構成が変わった・画面外なら null(ウィンドウ側で決める) */
+export function miniPosition(saved, env, size = 120) {
+  if (!saved || !Number.isFinite(saved.mx) || !Number.isFinite(saved.my)) return null;
+  if (String(saved.sig ?? "") !== String(env.sig ?? "")) return null;
+  const s = findScreen(env.screens, saved.mx + size / 2, saved.my + size / 2);
+  if (!s) return null;
+  return { x: Math.round(clamp(saved.mx, s.x, s.x + s.w - size)), y: Math.round(clamp(saved.my, s.y, s.y + s.h - size)) };
+}
+
+/**
+ * ミニから元の大きさに戻すときの位置。ペンギンの位置をそろえた anchor を基準に、
+ * ミニがある画面からはみ出さないよう寄せる(右上にあれば左下へ、右下にあれば左上へ開く)。
+ */
+export function expandPosition(env) {
+  const { anchor, at, win } = env;
+  const s = findScreen(env.screens, at?.x ?? anchor.x, at?.y ?? anchor.y) || findScreen(env.screens, anchor.x, anchor.y);
+  if (!s) return { x: Math.round(anchor.x), y: Math.round(anchor.y) };
+  return { x: Math.round(clamp(anchor.x, s.x, s.x + s.w - win.w)), y: Math.round(clamp(anchor.y, s.y, s.y + s.h - win.h)) };
+}
+
+/**
+ * PLACE の返事(位置+前回の大きさ・展開状態・ミニ表示)。
+ * opts.manual: 手動(タスクバー)で開いたときだけ前回のミニ表示を引き継ぐ。定時は通常表示で知らせる
+ */
+export function placeInfo(saved, env, opts = {}) {
   const p = choosePosition(saved, env);
-  const sz = (v) => (Number.isFinite(v) && v > 0 ? String(Math.round(v)) : "-");
-  return `PLACE ${p.x} ${p.y} ${sz(saved?.w)} ${sz(saved?.h)} ${saved?.expanded ? 1 : 0} ${p.centered ? "c" : "p"}`;
+  const sz = (v) => (Number.isFinite(v) && v > 0 ? Math.round(v) : null);
+  const m = miniPosition(saved, env);
+  return {
+    x: p.x, y: p.y, centered: p.centered, w: sz(saved?.w), h: sz(saved?.h), expanded: !!saved?.expanded,
+    mini: !!(opts.manual && saved?.mini), mx: m ? m.x : null, my: m ? m.y : null, miniTop: saved?.miniTop !== false,
+  };
+}
+export function placeReply(saved, env, opts = {}) {
+  return `PLACE ${encodeB64Json(placeInfo(saved, env, opts))}`;
 }

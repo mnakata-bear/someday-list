@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseLine, encodeB64Json, decodeB64Json, newTaskData, choosePosition, placeReply } from "../proto.mjs";
+import { parseLine, encodeB64Json, decodeB64Json, newTaskData, choosePosition, placeReply, placeInfo, miniPosition, expandPosition } from "../proto.mjs";
+import { acquireInstance, sendToPrimary } from "../instance.mjs";
 import { makeHandler } from "../handler.mjs";
 import { loadPos, savePos } from "../winstate.mjs";
 import { buildView, demoTasks, dueChips, sortKey, sortPending } from "../logic.mjs";
@@ -29,7 +30,10 @@ describe("1行プロトコル", () => {
     expect(parseLine("UNDONE abc")).toEqual({ type: "done", done: false, id: "abc" });
     expect(parseLine(`PLACE ${encodeB64Json({ sig: "s" })}`)).toEqual({ type: "place", env: { sig: "s" } });
     expect(parseLine(`STATE ${encodeB64Json({ x: 10.4, y: 20, sig: "s", w: 600, h: null, expanded: true })}`))
-      .toEqual({ type: "state", state: { x: 10, y: 20, sig: "s", w: 600, h: null, expanded: true } });
+      .toEqual({ type: "state", state: { x: 10, y: 20, sig: "s", w: 600, h: null, expanded: true, mini: false, mx: null, my: null, miniTop: true } });
+    expect(parseLine(`STATE ${encodeB64Json({ sig: "s", mini: true, mx: 1800.2, my: 30, miniTop: false })}`).state)
+      .toMatchObject({ mini: true, mx: 1800, my: 30, miniTop: false });
+    expect(parseLine(`EXPAND ${encodeB64Json({ anchor: { x: 1, y: 2 }, win: { w: 3, h: 4 } })}`).type).toBe("expand");
     // x だけ・y だけは「中央」(null)扱い
     expect(parseLine(`STATE ${encodeB64Json({ x: 10, sig: "s" })}`).state).toMatchObject({ x: null, y: null, expanded: false });
     expect(parseLine("HELLO")).toBeNull();
@@ -114,10 +118,35 @@ describe("ウィンドウ位置", () => {
     expect(choosePosition({ x: 1600, y: 600, sig: "A" }, env)).toEqual({ x: 1920 - 478, y: 1040 - 700, centered: false });
   });
   it("PLACE の返事に前回の大きさ・展開状態が入る", () => {
-    expect(placeReply(null, env)).toBe("PLACE 721 170 - - 0 c");
-    expect(placeReply({ x: 100, y: 50, sig: "A", w: 600, h: 320, expanded: true }, env)).toBe("PLACE 100 50 600 320 1 p");
+    expect(placeInfo(null, env)).toMatchObject({ x: 721, y: 170, centered: true, w: null, h: null, expanded: false, mini: false, miniTop: true });
+    expect(placeInfo({ x: 100, y: 50, sig: "A", w: 600, h: 320, expanded: true }, env)).toMatchObject({ x: 100, y: 50, centered: false, w: 600, h: 320, expanded: true });
     // 位置は中央に戻っても、大きさは引き継ぐ
-    expect(placeReply({ x: null, y: null, sig: "B", w: 600, h: null, expanded: false }, env)).toBe("PLACE 721 170 600 - 0 c");
+    expect(placeInfo({ x: null, y: null, sig: "B", w: 600, h: null, expanded: false }, env)).toMatchObject({ x: 721, y: 170, centered: true, w: 600, h: null });
+    expect(decodeB64Json(placeReply(null, env).split(" ")[1]).x).toBe(721);
+  });
+  it("ミニ表示は手動で開いたときだけ引き継ぐ(定時は通常表示で知らせる)", () => {
+    const saved = { x: 100, y: 50, sig: "A", mini: true, mx: 1780, my: 20, miniTop: false };
+    expect(placeInfo(saved, env, { manual: true })).toMatchObject({ mini: true, mx: 1780, my: 20, miniTop: false });
+    expect(placeInfo(saved, env, { manual: false })).toMatchObject({ mini: false, mx: 1780, my: 20 });
+  });
+  it("ミニの位置: 画面外・モニター構成が変わったら使わない、はみ出しは寄せる", () => {
+    expect(miniPosition({ sig: "A", mx: 1780, my: 20 }, env)).toEqual({ x: 1780, y: 20 });
+    expect(miniPosition({ sig: "A", mx: 1850, my: 960 }, env)).toEqual({ x: 1800, y: 920 });
+    expect(miniPosition({ sig: "A", mx: 3000, my: 20 }, env)).toBeNull();
+    expect(miniPosition({ sig: "B", mx: 1780, my: 20 }, env)).toBeNull();
+    expect(miniPosition({ sig: "A" }, env)).toBeNull();
+  });
+  it("ミニから戻す位置: 右上なら左下へ、右下なら左上へ、左上ならそのまま開く", () => {
+    const win = { w: 478, h: 700 };
+    const screens = env.screens;
+    // 右上(ペンギンは画面右端) → 左に寄せ、下へ伸びる
+    expect(expandPosition({ anchor: { x: 1800, y: 20 }, at: { x: 1860, y: 80 }, win, screens })).toEqual({ x: 1920 - 478, y: 20 });
+    // 右下 → 左上へ
+    expect(expandPosition({ anchor: { x: 1800, y: 950 }, at: { x: 1860, y: 1000 }, win, screens })).toEqual({ x: 1442, y: 340 });
+    // 左上 → そのまま
+    expect(expandPosition({ anchor: { x: 10, y: 10 }, at: { x: 70, y: 70 }, win, screens })).toEqual({ x: 10, y: 10 });
+    // 2枚目の画面(左)の右上 → その画面の中に収める
+    expect(expandPosition({ anchor: { x: -100, y: 10 }, at: { x: -60, y: 70 }, win, screens })).toEqual({ x: -478, y: 10 });
   });
 });
 
@@ -128,14 +157,47 @@ describe("位置・大きさの保存(window.json)", () => {
   it("保存して読み戻せる / 無ければ null / 壊れていれば null", () => {
     expect(loadPos()).toBeNull();
     savePos({ x: 1, y: 2, sig: "A", w: 600, h: null, expanded: true });
-    expect(loadPos()).toEqual({ x: 1, y: 2, sig: "A", w: 600, h: null, expanded: true });
-    expect(JSON.parse(readFileSync(join(dir, "window.json"), "utf8")).w).toBe(600);
+    expect(loadPos()).toEqual({ x: 1, y: 2, sig: "A", w: 600, h: null, expanded: true, mini: false, mx: null, my: null, miniTop: true });
+    savePos({ x: null, y: null, sig: "A", w: null, h: null, expanded: false, mini: true, mx: 1800, my: 10, miniTop: false });
+    expect(loadPos()).toMatchObject({ mini: true, mx: 1800, my: 10, miniTop: false });
+    expect(JSON.parse(readFileSync(join(dir, "window.json"), "utf8")).mini).toBe(true);
   });
   it("handler: STATE を保存し、PLACE で使う", async () => {
     const h = makeHandler({ demo: true, loadPos, savePos, now: () => 0 });
     expect(await h(`STATE ${encodeB64Json({ x: 100, y: 50, sig: "A", w: 600, h: 300, expanded: true })}`)).toBeNull();
     const env = { sig: "A", win: { w: 478, h: 700 }, center: { x: 721, y: 170 }, screens: [{ x: 0, y: 0, w: 1920, h: 1040 }] };
-    expect(await h(`PLACE ${encodeB64Json(env)}`)).toBe("PLACE 100 50 600 300 1 p");
+    const r = await h(`PLACE ${encodeB64Json(env)}`);
+    expect(decodeB64Json(r.split(" ")[1])).toMatchObject({ x: 100, y: 50, w: 600, h: 300, expanded: true, mini: false });
+  });
+  it("handler: 手動ならミニ表示を引き継ぐ / EXPAND に EXPANDTO で答える", async () => {
+    savePos({ x: null, y: null, sig: "A", mini: true, mx: 1700, my: 30 });
+    const env = { sig: "A", win: { w: 478, h: 700 }, center: { x: 721, y: 170 }, screens: [{ x: 0, y: 0, w: 1920, h: 1040 }] };
+    const hm = makeHandler({ demo: true, manual: true, loadPos, savePos, now: () => 0 });
+    expect(decodeB64Json((await hm(`PLACE ${encodeB64Json(env)}`)).split(" ")[1])).toMatchObject({ mini: true, mx: 1700, my: 30 });
+    const hs = makeHandler({ demo: true, manual: false, loadPos, savePos, now: () => 0 });
+    expect(decodeB64Json((await hs(`PLACE ${encodeB64Json(env)}`)).split(" ")[1]).mini).toBe(false);
+    expect(await hs(`EXPAND ${encodeB64Json({ anchor: { x: 1800, y: 20 }, at: { x: 1860, y: 80 }, win: { w: 478, h: 700 }, screens: env.screens })}`)).toBe("EXPANDTO 1442 20");
+  });
+});
+
+describe("多重起動の防止(名前付きパイプ)", () => {
+  it("1つ目は primary、2つ目は primary でなく、1つ目に「開いて」が届く。閉じたらまた primary になれる", async () => {
+    const name = `someday-test-${process.pid}-${Date.now()}`;
+    const got = [];
+    const a = await acquireInstance(name, (l) => got.push(l));
+    expect(a.primary).toBe(true);
+    const b = await acquireInstance(name, () => {});
+    expect(b.primary).toBe(false);
+    expect(await sendToPrimary(name, "OPEN scheduled")).toBe(true);
+    await new Promise((r) => setTimeout(r, 100));
+    expect(got).toEqual(["OPEN scheduled"]);
+    await a.close();
+    const c = await acquireInstance(name, () => {});
+    expect(c.primary).toBe(true);
+    await c.close();
+  });
+  it("誰もいなければ送れない(false)", async () => {
+    expect(await sendToPrimary(`someday-none-${Date.now()}`, "OPEN manual", 500)).toBe(false);
   });
 });
 

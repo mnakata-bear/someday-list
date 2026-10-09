@@ -11,7 +11,8 @@ $sh = New-Object -ComObject WScript.Shell
 foreach ($dir in $targets) {
   $lnk = $sh.CreateShortcut((Join-Path $dir 'いつかやること.lnk'))
   $lnk.TargetPath = Join-Path $env:WINDIR 'System32\wscript.exe'
-  $lnk.Arguments = '//B //Nologo "' + (Join-Path $here 'run-hidden.vbs') + '"'
+  # --manual: 手動で開いたしるし(前回ミニ表示ならミニで出す。すでに開いていればそれを前に出す)
+  $lnk.Arguments = '//B //Nologo "' + (Join-Path $here 'run-hidden.vbs') + '" --manual'
   $lnk.WorkingDirectory = $here
   $lnk.IconLocation = (Join-Path $here 'assets\icon.ico') + ',0'
   $lnk.Description = 'いつかやること(未完了タスクを表示)'

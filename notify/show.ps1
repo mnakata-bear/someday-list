@@ -1,8 +1,8 @@
 ﻿# いつかやること: 通知ウィンドウ「ふきだし」(WPF / PowerShell 5.1)。index.mjs から呼ばれる。見た目は mock-dialog-cute.html の .v2。
 # -Json: 表示内容(index.mjs が作る)  -Icon: ペンギンのアイコン PNG  -Shot: 見た目確認用(画面を PNG 保存して閉じる)
-# 確認用(マウスを動かさずに操作する): -AutoSeq "0,1,0" 行のチェックを順に押す / -AutoAdd "タイトル|期限キー|ラベル;..." 追加 / -AutoExpand 「ほか N件」を開く
+# 確認用(マウスを動かさずに操作する。-Shot のときはフォーカスを取らない): -AutoMini ミニ表示にする / -AutoSeq "0,1,0" 行のチェックを順に押す / -AutoAdd "タイトル|期限キー|ラベル;..." 追加 / -AutoExpand 「ほか N件」を開く
 # node とは1行プロトコルでやりとりする(詳しくは proto.mjs)。
-param([Parameter(Mandatory)][string]$Json, [string]$Icon, [string]$Shot, [string]$AutoSeq, [string]$AutoAdd, [switch]$AutoExpand)
+param([Parameter(Mandatory)][string]$Json, [string]$Icon, [string]$Shot, [string]$AutoSeq, [string]$AutoAdd, [switch]$AutoExpand, [switch]$AutoMini)
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, System.Drawing, System.Windows.Forms
 Add-Type -Namespace SomedayNotify -Name Win -MemberDefinition @'
@@ -235,6 +235,9 @@ $xaml = @"
   </Window.Resources>
   <Window.ContextMenu>
     <ContextMenu>
+      <MenuItem x:Name='mMini' Header='小さくする'/>
+      <MenuItem x:Name='mTop' Header='ミニ表示を常に最前面に' IsCheckable='True' IsChecked='True'/>
+      <Separator/>
       <MenuItem x:Name='mCenter' Header='中央に戻す'/>
       <MenuItem x:Name='mSize' Header='元の大きさに戻す'/>
       <MenuItem x:Name='mClose' Header='閉じる'/>
@@ -244,10 +247,16 @@ $xaml = @"
     <StackPanel x:Name='root' Width='430' HorizontalAlignment='Center'>
       <Grid>
         <Grid.ColumnDefinitions><ColumnDefinition Width='Auto'/><ColumnDefinition Width='*'/><ColumnDefinition Width='Auto'/></Grid.ColumnDefinitions>
-        <Border x:Name='av' Width='72' Height='72' CornerRadius='36' BorderBrush='White' BorderThickness='4' Background='White' VerticalAlignment='Bottom'>
-          <Border.Effect><DropShadowEffect BlurRadius='20' ShadowDepth='8' Direction='270' Opacity='0.5' Color='#281E64'/></Border.Effect>
-        </Border>
-        <Border Grid.Column='1' Margin='12,0,8,0' CornerRadius='22,22,22,6' Background='White' Padding='16,12,16,12' VerticalAlignment='Bottom' HorizontalAlignment='Left'>
+        <Grid x:Name='avG' Width='72' Height='72' VerticalAlignment='Bottom' Cursor='Hand' ToolTip='ダブルクリックで小さく / 元に戻す' RenderTransformOrigin='0.5,0.5'>
+          <Border x:Name='av' CornerRadius='36' BorderBrush='White' BorderThickness='4' Background='White'>
+            <Border.Effect><DropShadowEffect BlurRadius='20' ShadowDepth='8' Direction='270' Opacity='0.5' Color='#281E64'/></Border.Effect>
+          </Border>
+          <Border x:Name='badge' Visibility='Collapsed' MinWidth='26' Height='26' CornerRadius='13' Padding='6,0' HorizontalAlignment='Right' VerticalAlignment='Top' Margin='0,-6,-8,0' BorderBrush='White' BorderThickness='2.5' Background='$red'>
+            <Border.Effect><DropShadowEffect BlurRadius='8' ShadowDepth='2' Direction='270' Opacity='0.35' Color='#281E64'/></Border.Effect>
+            <TextBlock x:Name='badgeT' Foreground='White' FontSize='12' FontWeight='ExtraBold' HorizontalAlignment='Center' VerticalAlignment='Center'/>
+          </Border>
+        </Grid>
+        <Border x:Name='sayB' Grid.Column='1' Margin='12,0,8,0' CornerRadius='22,22,22,6' Background='White' Padding='16,12,16,12' VerticalAlignment='Bottom' HorizontalAlignment='Left'>
           <Border.Effect><DropShadowEffect BlurRadius='24' ShadowDepth='10' Direction='270' Opacity='0.3' Color='#281E64'/></Border.Effect>
           <StackPanel>
             <TextBox x:Name='date' $ro FontSize='11' FontWeight='ExtraBold' Foreground='$purple'/>
@@ -257,7 +266,7 @@ $xaml = @"
         <Button x:Name='x' Grid.Column='2' Style='{StaticResource XBtn}' VerticalAlignment='Top' ToolTip='閉じる (Esc)・右クリックで「中央に戻す」'/>
       </Grid>
       $listAndAdd
-      <Grid Margin='0,16,4,4'>
+      <Grid x:Name='foot' Margin='0,16,4,4'>
         $plus
         <StackPanel Orientation='Horizontal' HorizontalAlignment='Right'>
           <Button x:Name='close' Style='{StaticResource Ghost}' Content='閉じる'/>
@@ -295,6 +304,10 @@ $script:expanded = [bool]$v.expanded
 $script:hasPos = $false
 $script:userW = $null; $script:userH = $null
 $script:titleMax = 236
+$script:mini = $false; $script:miniTop = $true; $script:mx = $null; $script:my = $null
+$script:nx = $null; $script:ny = $null
+$script:addWasOpen = $false
+$script:quiet = [bool]$Shot   # 撮影(確認用)のときはフォーカスを取らない
 $script:labIdx = 0
 
 function Update-Say {
@@ -311,7 +324,11 @@ function Update-Say {
     $s2.Visibility = 'Visible'; $s2.Text = "のこり $($left)件だよ"
     if ($overLeft -gt 0) { $s3.Visibility = 'Visible'; $s3.Text = "期限切れが $($overLeft)件あるよ" } else { $s3.Visibility = 'Collapsed' }
   }
-  $w.FindName('listB').Visibility = if ($script:rows.Count -gt 0) { 'Visible' } else { 'Collapsed' }
+  if (-not $script:mini) { $w.FindName('listB').Visibility = if ($script:rows.Count -gt 0) { 'Visible' } else { 'Collapsed' } }
+  # ミニ表示のバッジ(のこり件数。期限切れがあれば赤、なければ紫)
+  $w.FindName('badgeT').Text = if ($left -gt 99) { '99+' } else { [string][Math]::Max(0, $left) }
+  $w.FindName('badge').Background = New-Object Windows.Media.SolidColorBrush([Windows.Media.ColorConverter]::ConvertFromString($(if ($overLeft -gt 0) { $red } else { $purple })))
+  $script:badgeLeft = $left
 }
 
 function Say-Error([string]$msg) {
@@ -421,6 +438,7 @@ function Open-AddForm {
   $tt.BeginAnimation([Windows.Media.TranslateTransform]::YProperty, (New-Object Windows.Media.Animation.DoubleAnimation(10, 0, [TimeSpan]::FromMilliseconds(280))))
   $f.BeginAnimation([Windows.UIElement]::OpacityProperty, (New-Object Windows.Media.Animation.DoubleAnimation(0, 1, [TimeSpan]::FromMilliseconds(280))))
   Apply-Size; Keep-Inside
+  if ($script:quiet) { return }
   $w.Activate() | Out-Null
   $inp = $w.FindName('inp')
   $null = $w.Dispatcher.BeginInvoke([Action]{ $w.FindName('inp').Focus() | Out-Null; [Windows.Input.Keyboard]::Focus($w.FindName('inp')) | Out-Null }, [Windows.Threading.DispatcherPriority]::Input)
@@ -504,8 +522,9 @@ function Reveal {
 function Save-State {
   if (-not $script:placed) { return }
   $env = Get-ScreenEnv
-  $st = @{ sig = $env.sig; expanded = $script:expanded; x = $null; y = $null; w = $script:userW; h = $script:userH }
-  if ($script:hasPos) { $st.x = [Math]::Round($w.Left); $st.y = [Math]::Round($w.Top) }
+  $st = @{ sig = $env.sig; expanded = $script:expanded; x = $null; y = $null; w = $script:userW; h = $script:userH
+          mini = $script:mini; mx = $script:mx; my = $script:my; miniTop = $script:miniTop }
+  if ($script:hasPos -and $null -ne $script:nx) { $st.x = [Math]::Round($script:nx); $st.y = [Math]::Round($script:ny) }
   Send ("STATE " + (To-B64 $st))
 }
 
@@ -563,6 +582,94 @@ function Reset-Size {
   Save-State
 }
 
+# ---------- ミニ表示(ペンギンの顔だけ) ----------
+function Avatar-Offset { $p = $w.FindName('avG').TranslatePoint((New-Object Windows.Point(0, 0)), $w); $p }
+function Set-NormalParts([string]$vis) {
+  foreach ($n in 'sayB', 'x', 'foot') { $w.FindName($n).Visibility = $vis }
+}
+function Enter-Mini([bool]$animate) {
+  if ($script:mini) { return }
+  if ($w.FindName('listB') -eq $null) { return }
+  $off = Avatar-Offset
+  $ax = $w.Left + $off.X; $ay = $w.Top + $off.Y
+  $script:addWasOpen = ($w.FindName('addB').Visibility -eq 'Visible')
+  $script:mini = $true
+  Set-NormalParts 'Collapsed'
+  $w.FindName('listB').Visibility = 'Collapsed'; $w.FindName('addB').Visibility = 'Collapsed'
+  $w.FindName('badge').Visibility = 'Visible'
+  $w.FindName('root').Width = 72; $w.Width = 120
+  $w.UpdateLayout()
+  if ($null -ne $script:mx) { $w.Left = $script:mx; $w.Top = $script:my } else { $w.Left = $ax - 24; $w.Top = $ay - 24; $script:mx = $w.Left; $script:my = $w.Top }
+  $w.Topmost = $script:miniTop
+  $w.FindName('mMini').Header = '元に戻す'
+  if ($animate) {
+    $sc = New-Object Windows.Media.ScaleTransform(1.25, 1.25)
+    $w.FindName('avG').RenderTransform = $sc
+    $an = New-Object Windows.Media.Animation.DoubleAnimation(1.25, 1, [TimeSpan]::FromMilliseconds(220))
+    $an.EasingFunction = New-Object Windows.Media.Animation.CubicEase
+    $sc.BeginAnimation([Windows.Media.ScaleTransform]::ScaleXProperty, $an); $sc.BeginAnimation([Windows.Media.ScaleTransform]::ScaleYProperty, $an)
+  }
+  Save-State
+}
+function Exit-Mini {
+  if (-not $script:mini) { return }
+  $mL = $w.Left; $mT = $w.Top
+  $script:mini = $false
+  $w.FindName('badge').Visibility = 'Collapsed'
+  Set-NormalParts 'Visible'
+  if ($script:addWasOpen) { $w.FindName('addB').Visibility = 'Visible' }
+  Update-Say
+  $w.Opacity = 0
+  Apply-Size
+  $w.UpdateLayout()
+  $off = Avatar-Offset
+  # ミニのペンギンの位置に、通常表示のペンギンがくるように置く(画面からはみ出す分は node 側で寄せる)
+  $env = Get-ScreenEnv
+  $script:expandEnv = @{ anchor = @{ x = $mL + 24 - $off.X; y = $mT + 24 - $off.Y }; at = @{ x = $mL + 60; y = $mT + 60 }; win = @{ w = $w.ActualWidth; h = $w.ActualHeight }; screens = $env.screens }
+  $w.Left = $script:expandEnv.anchor.x; $w.Top = $script:expandEnv.anchor.y
+  $w.Topmost = $false
+  $w.FindName('mMini').Header = '小さくする'
+  $sc = New-Object Windows.Media.ScaleTransform(0.96, 0.96)
+  $w.FindName('root').RenderTransform = $sc
+  if ($script:inTimer) {
+    Send ("EXPAND " + (To-B64 $script:expandEnv))
+    $script:et = New-Object Windows.Threading.DispatcherTimer
+    $script:et.Interval = [TimeSpan]::FromMilliseconds(500)
+    $script:et.Add_Tick({ $script:et.Stop(); Finish-Expand $null $null })
+    $script:et.Start()
+  } else { Finish-Expand $null $null }
+}
+function Finish-Expand($x, $y) {
+  if ($script:et) { $script:et.Stop() }
+  if ($null -ne $x) { $w.Left = $x; $w.Top = $y } else { Keep-Inside }
+  $script:hasPos = $true; $script:nx = $w.Left; $script:ny = $w.Top
+  if ($env:SOMEDAY_DEBUG) { [Console]::Error.WriteLine("[show] expanded to $($w.Left),$($w.Top) size=$($w.ActualWidth)x$($w.ActualHeight) (node=$($null -ne $x))") }
+  $w.BeginAnimation([Windows.Window]::OpacityProperty, (New-Object Windows.Media.Animation.DoubleAnimation(0, 1, [TimeSpan]::FromMilliseconds(220))))
+  $sc = $w.FindName('root').RenderTransform
+  $an = New-Object Windows.Media.Animation.DoubleAnimation(0.96, 1, [TimeSpan]::FromMilliseconds(240))
+  $an.EasingFunction = New-Object Windows.Media.Animation.CubicEase
+  $sc.BeginAnimation([Windows.Media.ScaleTransform]::ScaleXProperty, $an); $sc.BeginAnimation([Windows.Media.ScaleTransform]::ScaleYProperty, $an)
+  Save-State
+}
+function Toggle-Mini { if ($script:mini) { Exit-Mini } else { Enter-Mini $true } }
+function Bring-Front {
+  if ($w.WindowState -eq 'Minimized') { $w.WindowState = 'Normal' }
+  $w.Topmost = $true
+  if (-not $script:quiet) { $h = (New-Object Windows.Interop.WindowInteropHelper($w)).Handle; [SomedayNotify.Win]::SetForegroundWindow($h) | Out-Null; $w.Activate() | Out-Null }
+  $script:t.Stop(); $script:t.Start()
+}
+# 2つ目の起動(定時)から届いた最新の一覧に入れ替える
+function Load-View($nv) {
+  $script:v = $nv
+  $script:rows.Clear(); $w.FindName('listP').Children.Clear()
+  $script:total = [int]$nv.total; $script:overdueTotal = [int]$nv.overdue; $script:anyChange = $false
+  foreach ($it in @($nv.items) + @($nv.rest)) { if ($it) { $r = New-Row $it; [void]$script:rows.Add($r); $w.FindName('listP').Children.Add($r.el) | Out-Null } }
+  $w.FindName('date').Text = "$($nv.dateLabel) · $($nv.timeLabel)"
+  Apply-Rows $false
+  Update-Say
+  if (-not $script:mini) { Apply-Size }
+}
+
 # ---------- node からの返事(標準入力)を読む ----------
 function On-Reply([string]$line) {
   $p = $line.Trim().Split(' ')
@@ -582,20 +689,28 @@ function On-Reply([string]$line) {
     'ADDERR' { On-AddErr $p[1] $p[2] }
     'PLACE' {
       if (-not $script:placed) {
-        if ($p[3] -ne '-') { $script:userW = [double]$p[3] }
-        if ($p[4] -ne '-') { $script:userH = [double]$p[4] }
-        if ($p[5] -eq '1') { $script:expanded = $true }
+        $pl = From-B64 $p[1]
+        if ($pl.w) { $script:userW = [double]$pl.w }
+        if ($pl.h) { $script:userH = [double]$pl.h }
+        if ($pl.expanded) { $script:expanded = $true }
+        $script:miniTop = [bool]$pl.miniTop; $w.FindName('mTop').IsChecked = $script:miniTop
+        if ($null -ne $pl.mx) { $script:mx = [double]$pl.mx; $script:my = [double]$pl.my }
         if ($w.FindName('sv')) { Apply-Rows $false; Apply-Size }
         $w.UpdateLayout()
-        $cx = $wa.Left + ($wa.Width - $w.ActualWidth) / 2
-        $w.Left = [double]$p[1]; $w.Top = [double]$p[2]
+        $w.Left = [double]$pl.x; $w.Top = [double]$pl.y
         # node が「中央」と答えたとき(保存なし・画面外・モニター構成が変わった)は、今の大きさで中央に置き直す
-        $script:hasPos = -not ($p[6] -eq 'c')
+        $script:hasPos = -not $pl.centered
         if (-not $script:hasPos) { Center-Window }
-        Keep-Inside; Reveal
-        if ($env:SOMEDAY_DEBUG) { [Console]::Error.WriteLine("[show] placed at $($w.Left),$($w.Top) size=$($w.ActualWidth)x$($w.ActualHeight) userW=$($script:userW) userH=$($script:userH) expanded=$($script:expanded)") }
+        Keep-Inside
+        $script:nx = $w.Left; $script:ny = $w.Top
+        if ($pl.mini) { Enter-Mini $false }
+        Reveal
+        if ($env:SOMEDAY_DEBUG) { [Console]::Error.WriteLine("[show] placed at $($w.Left),$($w.Top) size=$($w.ActualWidth)x$($w.ActualHeight) userW=$($script:userW) userH=$($script:userH) expanded=$($script:expanded) mini=$($script:mini)") }
       }
     }
+    'EXPANDTO' { if (-not $script:mini) { Finish-Expand ([double]$p[1]) ([double]$p[2]) } }
+    'RELOAD' { try { Load-View (From-B64 $p[1]) } catch { [Console]::Error.WriteLine("[show] reload failed: $_") } }
+    'OPEN' { if ($p[1] -eq 'normal') { Exit-Mini }; Bring-Front }
   }
 }
 
@@ -661,6 +776,7 @@ if ([Console]::IsInputRedirected -and $v.kind -eq 'list') {
 $svI = $w.FindName('sv'); if ($svI) { $svI.MaxHeight = [Math]::Max(150, $wa.Height - 470) }
 $w.MaxHeight = [System.Windows.SystemParameters]::VirtualScreenHeight
 $w.Opacity = 0
+if ($script:quiet) { $w.ShowActivated = $false }
 $w.Add_PreviewKeyDown({ param($s, $e)
   if ($e.Key -ne 'Escape') { return }
   $inp = $w.FindName('inp')
@@ -668,19 +784,27 @@ $w.Add_PreviewKeyDown({ param($s, $e)
   if ($f -and $f.Visibility -eq 'Visible') { Close-AddForm; $e.Handled = $true; return }
   $s.Close() })
 # どこを掴んでも移動できる(文字・入力欄・ボタン・チェックは除く)。離したら位置を保存
+# ペンギンのダブルクリックで、ミニ表示(顔だけ) ⇔ 元の大きさ
 $w.Add_MouseLeftButtonDown({ param($s, $e)
   if ($e.OriginalSource -is [System.Windows.Controls.TextBox]) { return }
+  if ($e.ClickCount -ge 2 -and $w.FindName('avG').IsMouseOver -and $v.kind -eq 'list') { $e.Handled = $true; Toggle-Mini; return }
   $l0 = $s.Left; $t0 = $s.Top
   try { $s.DragMove() } catch {}
-  if ([Math]::Abs($s.Left - $l0) -ge 1 -or [Math]::Abs($s.Top - $t0) -ge 1) { $script:hasPos = $true; Save-State } })
+  if ([Math]::Abs($s.Left - $l0) -ge 1 -or [Math]::Abs($s.Top - $t0) -ge 1) {
+    if ($script:mini) { $script:mx = $s.Left; $script:my = $s.Top } else { $script:hasPos = $true; $script:nx = $s.Left; $script:ny = $s.Top }
+    Save-State
+  } })
+$w.FindName('mMini').Add_Click({ Toggle-Mini })
+$w.FindName('mTop').Add_Click({ $script:miniTop = [bool]$w.FindName('mTop').IsChecked; if ($script:mini) { $w.Topmost = $script:miniTop }; Save-State })
+if ($v.kind -ne 'list') { $w.FindName('mMini').Visibility = 'Collapsed'; $w.FindName('mTop').Visibility = 'Collapsed' }
 $w.FindName('x').Add_Click({ $w.Close() })
 $w.FindName('close').Add_Click({ $w.Close() })
 $w.FindName('mClose').Add_Click({ $w.Close() })
-$w.FindName('mCenter').Add_Click({ Center-Window; Keep-Inside; $script:hasPos = $false; Save-State })
-$w.FindName('mSize').Add_Click({ if ($w.FindName('sv')) { Reset-Size; Keep-Inside } })
+$w.FindName('mCenter').Add_Click({ if ($script:mini) { Exit-Mini }; Center-Window; Keep-Inside; $script:hasPos = $false; $script:nx = $null; Save-State })
+$w.FindName('mSize').Add_Click({ if ($w.FindName('sv')) { if ($script:mini) { Exit-Mini }; Reset-Size; Keep-Inside } })
 $openBtn = $w.FindName('open')
 if ($openBtn) { $openBtn.Add_Click({ Start-Process $v.appUrl; $w.Close() }) }
-$w.Add_SizeChanged({ if ($script:placed) { Keep-Inside } })
+$w.Add_SizeChanged({ if ($script:placed -and -not $script:mini) { Keep-Inside } })
 
 $w.Add_Loaded({
   # 一覧部分だけスクロールにして、ウィンドウは画面の高さに収める
@@ -689,9 +813,9 @@ $w.Add_Loaded({
   # タスクスケジューラ(wscript の非表示起動)経由だと、起動時の「隠す」指定が最初の表示に引き継がれて
   # ウィンドウが見えないことがある。見えていなければ明示的に表示する
   $h = (New-Object Windows.Interop.WindowInteropHelper($w)).Handle
-  if (-not [SomedayNotify.Win]::IsWindowVisible($h)) { [Console]::Error.WriteLine('[show] window was hidden at load; ShowWindow(SW_SHOW)'); [SomedayNotify.Win]::ShowWindow($h, 5) | Out-Null }
-  [SomedayNotify.Win]::SetForegroundWindow($h) | Out-Null
-  $w.Activate() | Out-Null
+  $showCmd = if ($script:quiet) { 4 } else { 5 }   # 4=SW_SHOWNOACTIVATE(撮影時はフォーカスを取らない)
+  if (-not [SomedayNotify.Win]::IsWindowVisible($h)) { [Console]::Error.WriteLine('[show] window was hidden at load; ShowWindow'); [SomedayNotify.Win]::ShowWindow($h, $showCmd) | Out-Null }
+  if (-not $script:quiet) { [SomedayNotify.Win]::SetForegroundWindow($h) | Out-Null; $w.Activate() | Out-Null }
   # 前回動かした位置を node に聞く(返事が無ければ中央のまま出す)
   if ($script:inTimer) {
     Send ("PLACE " + (To-B64 (Get-ScreenEnv)))
@@ -703,12 +827,13 @@ $w.Add_Loaded({
   # 最前面は数秒だけ
   $script:t = New-Object Windows.Threading.DispatcherTimer
   $script:t.Interval = [TimeSpan]::FromSeconds(5)
-  $script:t.Add_Tick({ $script:t.Stop(); $w.Topmost = $false })
+  $script:t.Add_Tick({ $script:t.Stop(); if (-not $script:mini) { $w.Topmost = $false } })
   $script:t.Start()
 
   # ---- 確認用の自動操作(マウス・キーボードは使わない) ----
   $script:auto = [System.Collections.Queue]::new()
   if ($AutoExpand) { $script:auto.Enqueue({ Toggle-Expand }) }
+  if ($AutoMini) { $script:auto.Enqueue({ Toggle-Mini }) }
   if ($AutoAdd) {
     $script:auto.Enqueue({ Open-AddForm })
     foreach ($a in ($AutoAdd -split ';')) {

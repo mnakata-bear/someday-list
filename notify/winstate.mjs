@@ -13,13 +13,15 @@ export function loadPos() {
     const p = JSON.parse(readFileSync(file(), "utf8"));
     if (!p || typeof p !== "object") return null;
     const n = (v) => (Number.isFinite(v) ? v : null);
-    return { x: n(p.x), y: n(p.y), sig: String(p.sig ?? ""), w: n(p.w), h: n(p.h), expanded: p.expanded === true };
+    return { x: n(p.x), y: n(p.y), sig: String(p.sig ?? ""), w: n(p.w), h: n(p.h), expanded: p.expanded === true,
+      mini: p.mini === true, mx: n(p.mx), my: n(p.my), miniTop: p.miniTop !== false };
   } catch { return null; }
 }
-/** 位置(x,y)・大きさ(w,h)・展開状態を保存。null は「中央」「元の大きさ」 */
+/** 位置(x,y)・大きさ(w,h)・展開状態・ミニ表示(mini, mx,my, miniTop)を保存。null は「中央」「元の大きさ」 */
 export function savePos(st) {
   mkdirSync(stateDir(), { recursive: true });
-  writeFileSync(file(), JSON.stringify({ x: st.x, y: st.y, sig: st.sig, w: st.w, h: st.h, expanded: !!st.expanded }), "utf8");
+  writeFileSync(file(), JSON.stringify({ x: st.x, y: st.y, sig: st.sig, w: st.w, h: st.h, expanded: !!st.expanded,
+    mini: !!st.mini, mx: st.mx ?? null, my: st.my ?? null, miniTop: st.miniTop !== false }), "utf8");
 }
 export function clearPos() {
   rmSync(file(), { force: true });

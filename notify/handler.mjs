@@ -1,5 +1,5 @@
 // show.ps1 から届いた1行を処理して、返事の1行を返す(返事が要らなければ null)
-import { parseLine, newTaskData, placeReply, encodeB64Json } from "./proto.mjs";
+import { parseLine, newTaskData, placeReply, expandPosition, encodeB64Json } from "./proto.mjs";
 import { itemView } from "./logic.mjs";
 
 /**
@@ -7,6 +7,7 @@ import { itemView } from "./logic.mjs";
  *   demo: true なら Firestore に書かない(見た目だけ)
  *   setDone(id, done), addTask(data) → id   Firestore 書き込み
  *   loadPos(), savePos(state)               位置・大きさの保存
+ *   manual: 手動(タスクバー)で開いた(前回のミニ表示を引き継ぐ)
  *   now(): ms
  */
 export function makeHandler(deps) {
@@ -37,7 +38,11 @@ export function makeHandler(deps) {
     }
     if (cmd.type === "place") {
       if (process.env.SOMEDAY_DEBUG) deps.log?.(`[place] sig=${cmd.env.sig} center=${JSON.stringify(cmd.env.center)} win=${JSON.stringify(cmd.env.win)}`);
-      return placeReply(deps.loadPos(), cmd.env);
+      return placeReply(deps.loadPos(), cmd.env, { manual: !!deps.manual });
+    }
+    if (cmd.type === "expand") {
+      const p = expandPosition(cmd.env);
+      return `EXPANDTO ${p.x} ${p.y}`;
     }
     if (cmd.type === "state") {
       try { deps.savePos(cmd.state); } catch (e) { deps.log?.(`位置を保存できません: ${e?.message ?? e}`); }

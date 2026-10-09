@@ -54,7 +54,7 @@ await seed();
 const here = dirname(fileURLToPath(import.meta.url));
 const shot = process.env.SOMEDAY_SHOT_DIR ? join(process.env.SOMEDAY_SHOT_DIR, "emu.png") : "";
 const r = spawnSync(process.execPath, [join(here, "..", "index.mjs")], {
-  env: { ...process.env, SOMEDAY_AUTOSEQ: "0,1,2,2", SOMEDAY_AUTOADD: "エミュで  追加|0|1", SOMEDAY_STATE_DIR: join(process.env.TEMP || ".", "someday-emu-state"), SOMEDAY_SHOT: shot || join(process.env.TEMP || ".", "someday-emu.png") },
+  env: { ...process.env, SOMEDAY_AUTOSEQ: "0,1,2,2", SOMEDAY_AUTOADD: "エミュで  追加|0|1", SOMEDAY_STATE_DIR: join(process.env.TEMP || ".", "someday-emu-state"), SOMEDAY_PIPE: `someday-emu-${process.pid}`, SOMEDAY_SHOT: shot || join(process.env.TEMP || ".", "someday-emu.png") },
   stdio: "inherit", timeout: 60000,
 });
 assert.equal(r.status, 0);
