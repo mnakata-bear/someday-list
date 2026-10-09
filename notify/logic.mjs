@@ -53,6 +53,7 @@ export function buildView(tasks, now = new Date(), max = MAX_ITEMS) {
   const items = sorted.slice(0, max).map((t) => {
     const di = dueInfo(t.due || "", now);
     return {
+      id: String(t.id),
       title: t.title || "(無題)",
       due: di.txt,
       dueCls: di.cls,
@@ -98,4 +99,26 @@ export function demoTasks(now = new Date()) {
     mk(11, "写真データのバックアップ", "", "private"),
     mk(12, "名刺を整理する", "", "work"),
   ];
+}
+
+/* ---------- ダイアログからの完了/取り消し ---------- */
+const ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
+
+/** show.ps1 から届く1行(DONE <id> / UNDONE <id>)を解析。それ以外は null */
+export function parseCommand(line) {
+  const m = /^(DONE|UNDONE) (\S+)$/.exec(String(line).trim());
+  if (!m || !ID_RE.test(m[2])) return null;
+  return { done: m[1] === "DONE", id: m[2] };
+}
+
+/** タスクに書き込む内容(アプリ本体 src/store/firestore.ts の setDone と同じ形) */
+export function taskPatch(done, now) {
+  const t = Math.floor(now);
+  return { done, doneAt: done ? t : null, updatedAt: t };
+}
+
+/** スタンプ累計に ±1(0 未満にはしない。src/core/logic.ts の applyStampDelta と同じ) */
+export function stampAfter(total, delta) {
+  const t = Math.floor(Number.isFinite(total) ? total : 0) + delta;
+  return t < 0 ? 0 : t;
 }

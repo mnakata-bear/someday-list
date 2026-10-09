@@ -78,3 +78,30 @@ describe("buildView", () => {
     expect(v.total).toBeGreaterThan(5);
   });
 });
+
+import { parseCommand, taskPatch, stampAfter } from "../logic.mjs";
+
+describe("ダイアログからのコマンド", () => {
+  it("DONE / UNDONE を解析", () => {
+    expect(parseCommand("DONE abc_123")).toEqual({ done: true, id: "abc_123" });
+    expect(parseCommand("UNDONE X-9\r")).toEqual({ done: false, id: "X-9" });
+  });
+  it("それ以外・不正なIDは null", () => {
+    for (const l of ["", "DONE", "done a", "DONE a b", "DONE ../x", "DONE a/b", "OK a", `DONE ${"a".repeat(129)}`]) expect(parseCommand(l)).toBeNull();
+  });
+});
+
+describe("書き込む内容(アプリ本体と同じ形)", () => {
+  it("完了: done=true, doneAt=updatedAt=今(整数)", () => {
+    expect(taskPatch(true, 1760000000123.7)).toEqual({ done: true, doneAt: 1760000000123, updatedAt: 1760000000123 });
+  });
+  it("取り消し: doneAt=null", () => {
+    expect(taskPatch(false, 5)).toEqual({ done: false, doneAt: null, updatedAt: 5 });
+  });
+  it("スタンプ累計は ±1、0未満にしない", () => {
+    expect(stampAfter(3, 1)).toBe(4);
+    expect(stampAfter(3, -1)).toBe(2);
+    expect(stampAfter(0, -1)).toBe(0);
+    expect(stampAfter(NaN, 1)).toBe(1);
+  });
+});

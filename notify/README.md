@@ -8,7 +8,9 @@
 
 - 一覧は 期限切れ(赤) → 今日まで → 期限が近い順 → 期限なし の順で最大5件。超えた分は最下行に「ほか N件」。
 - 行ごとにラベルのはんこ(仕事=紫、プライベート=ピンク)、メモがあるタスクは小さな印。
-- ボタンは「閉じる」と「アプリを開く」。Esc でも閉じます。ドラッグで移動できます。
+- 各行の左の丸いチェックを押すと、そのタスクを完了にします(アプリと同じ「済」スタンプが押され、取り消し線)。もう一度押すと未完了に戻ります。
+  書き込みはアプリ本体と同じ形(`done` / `doneAt` / `updatedAt`、`meta/stats` の `stampTotal` を +1 / -1、0未満にしない)。保存できなかったときは元に戻り、ペンギンが「保存できなかったよ」と言います。`--demo` では書き込みません。
+- ボタンは「閉じる」と「アプリを開く」、右上の ×。Esc でも閉じます。ドラッグで移動できます。
 - 最前面になるのは表示後の約5秒だけ。文字は選択・コピーできます。
 
 ## 準備
@@ -17,7 +19,7 @@
 3. ダウンロードした JSON を、次の場所に `key.json` として置く。
    `C:\Users\work\.someday-notify\key.json`
    別の場所に置くなら、環境変数 `SOMEDAY_KEY` にそのパスを入れる。
-   鍵はリポジトリに入れない(`.gitignore` 済み)。読み取り専用(`spaces/home/tasks` の取得のみ)で使います。
+   鍵はリポジトリに入れない(`.gitignore` 済み)。使うのは `spaces/home/tasks` の取得と、ダイアログでチェックしたタスクの完了/取り消し(+ `spaces/home/meta/stats` のスタンプ累計)だけです。
 
 ## 使い方
 | やりたいこと | コマンド |
@@ -41,14 +43,14 @@
 - 今すぐタスク経由で試す: `Start-ScheduledTask -TaskName SomedayListNotify`
 
 ## テスト
-- 単体テスト: `npm test`(並べ替え・期限表示・件数上限・JST日付)
-- エミュレータでの取得確認(リポジトリ直下で。本番には接続しません):
+- 単体テスト: `npm test`(並べ替え・期限表示・件数上限・JST日付・チェックのコマンド解析と書き込み内容)
+- エミュレータでの取得・書き込み確認(ダイアログを自動で操作して書き込みまで見ます)(リポジトリ直下で。本番には接続しません):
   `firebase emulators:exec --only firestore --project demo-someday "node notify/test/emulator-check.mjs"`
   (Java が必要。Android Studio 同梱の JBR を `JAVA_HOME` と `PATH` に通す)
 
 ## トラブルシュート
 - 「鍵ファイルが見つかりません」: 上の場所に `key.json` があるか、`SOMEDAY_KEY` のパスを確認。
 - 「読み取りに失敗しました」: ネットワーク、鍵の権限(Cloud Datastore ユーザー相当)、鍵が失効していないかを確認。
-- 表示されない: `node index.mjs --demo` で出るか確認。タスクの場合は `Get-ScheduledTaskInfo -TaskName SomedayListNotify` で LastTaskResult を見る。
+- 表示されない: `node index.mjs --demo` で出るか確認。タスクから起動したときの出力は `%TEMP%\someday-notify.log` に残ります。タスクの場合は `Get-ScheduledTaskInfo -TaskName SomedayListNotify` で LastTaskResult を見る。
 - `node` が見つからない(タスク実行時): ユーザーの PATH に Node.js があるか確認。
-- 日本語が化ける: `.ps1` は UTF-8 BOM 付きで保存してください(PowerShell 5.1 の仕様)。
+- 日本語が化ける: `.ps1` は UTF-8 BOM 付きで保存してください(PowerShell 5.1 の仕様)。`run.cmd` と `run-hidden.vbs` は ANSI で読まれるので英数字だけにしています。
