@@ -63,7 +63,7 @@ export function buildView(tasks, now = new Date(), max = MAX_ITEMS) {
   });
   return {
     kind: "list",
-    greeting: jstDate(now).hh < 11 ? "おはよう！" : "こんにちは！",
+    greeting: jstDate(now).hh < 11 ? "おはよう！" : jstDate(now).hh < 17 ? "こんにちは！" : "こんばんは！",
     dateLabel: dateLabel(now),
     timeLabel: (() => { const t = jstDate(now); return `${String(t.hh).padStart(2, "0")}:${String(t.mm).padStart(2, "0")}`; })(),
     overdue: sorted.filter((t) => dueInfo(t.due || "", now).cls === "over").length,

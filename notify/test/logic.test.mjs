@@ -59,6 +59,8 @@ describe("buildView", () => {
   it("挨拶は時間帯で変わる(JST)", () => {
     expect(buildView([], NOW).greeting).toBe("おはよう！");
     expect(buildView([], new Date("2026-10-09T03:00:00Z")).greeting).toBe("こんにちは！");
+    expect(buildView([], new Date("2026-10-09T06:00:00Z")).greeting).toBe("こんにちは！"); // 15時
+    expect(buildView([], new Date("2026-10-09T09:00:00Z")).greeting).toBe("こんばんは！"); // 18時
   });
   it("0件", () => expect(buildView([], NOW)).toMatchObject({ total: 0, more: 0, items: [] }));
   it("ラベル・メモ・期限切れの色", () => {
