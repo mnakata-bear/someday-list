@@ -54,7 +54,7 @@ await seed();
 const here = dirname(fileURLToPath(import.meta.url));
 const shot = process.env.SOMEDAY_SHOT_DIR ? join(process.env.SOMEDAY_SHOT_DIR, "emu.png") : "";
 const r = spawnSync(process.execPath, [join(here, "..", "index.mjs")], {
-  env: { ...process.env, SOMEDAY_AUTOSEQ: "0,1,2,2", SOMEDAY_SHOT: shot || join(process.env.TEMP || ".", "someday-emu.png") },
+  env: { ...process.env, SOMEDAY_AUTOSEQ: "0,1,2,2", SOMEDAY_AUTOADD: "エミュで  追加|0|1", SOMEDAY_STATE_DIR: join(process.env.TEMP || ".", "someday-emu-state"), SOMEDAY_SHOT: shot || join(process.env.TEMP || ".", "someday-emu.png") },
   stdio: "inherit", timeout: 60000,
 });
 assert.equal(r.status, 0);
@@ -63,3 +63,13 @@ assert.equal(got.b.done, true); assert.equal(got.c.done, true); assert.equal(got
 assert.ok(Number.isInteger(got.b.doneAt)); assert.equal(got.a.doneAt, null);
 assert.equal((await stats.get()).data().stampTotal, 2);
 console.log("OK 3: ダイアログのチェックで b,c が完了、a は取り消し、stampTotal=2");
+// 4) ダイアログからの追加(ADD): アプリ本体と同じ形のドキュメントができる
+const added = Object.entries(got).filter(([id]) => !["a", "b", "c", "d"].includes(id));
+assert.equal(added.length, 1, "1件追加される");
+const [newId, nd] = added[0];
+assert.match(newId, /^[A-Za-z0-9]{20}$/, "Firestore の自動ID");
+assert.deepEqual(Object.keys(nd).sort(), ["createdAt", "done", "doneAt", "due", "label", "note", "title", "updatedAt"]);
+assert.equal(nd.title, "エミュで 追加"); assert.equal(nd.due, ""); assert.equal(nd.label, "work"); assert.equal(nd.note, "");
+assert.equal(nd.done, false); assert.equal(nd.doneAt, null);
+assert.ok(Number.isInteger(nd.createdAt) && nd.createdAt === nd.updatedAt);
+console.log("OK 4: ダイアログから追加 → 自動ID・アプリと同じ8項目・空白は1つにまとまる");

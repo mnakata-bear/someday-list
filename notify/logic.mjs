@@ -48,21 +48,57 @@ export function sortPending(tasks) {
 }
 
 /** ウィンドウに出す内容。最大 max 件、超えた分は more に件数 */
+/** 並び順のキー(文字列比較で sortPending と同じ順になる) */
+export function sortKey(t) {
+  return `${t.due || "9999-99-99"}|${String(Math.max(0, ms(t.createdAt))).padStart(15, "0")}|${t.id}`;
+}
+
+/** 一覧の1行分(ウィンドウ側はこれをそのまま表示する) */
+export function itemView(t, now = new Date()) {
+  const di = dueInfo(t.due || "", now);
+  return {
+    id: String(t.id),
+    key: sortKey(t),
+    title: t.title || "(無題)",
+    due: di.txt,
+    dueCls: di.cls,
+    label: t.label === "work" || t.label === "private" ? LABELS[t.label] : "",
+    labelKey: t.label === "work" || t.label === "private" ? t.label : "",
+    hasNote: !!(t.note && String(t.note).trim()),
+  };
+}
+
+/** 追加フォームの期限チップ(JST)。今週末=今日以降の土曜(日曜なら今日)、来週=7日後 */
+export function dueChips(now = new Date()) {
+  const t = jstDate(now);
+  const add = (n) => {
+    const d = new Date(Date.UTC(t.y, t.m - 1, t.d + n));
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+  };
+  const toSat = t.dow === 0 ? 0 : 6 - t.dow;
+  return [
+    { k: "none", label: "なし", ymd: "" },
+    { k: "today", label: "今日", ymd: add(0) },
+    { k: "tomorrow", label: "明日", ymd: add(1) },
+    { k: "weekend", label: "今週末", ymd: add(toSat) },
+    { k: "nextweek", label: "来週", ymd: add(7) },
+  ];
+}
+
+/**
+ * ウィンドウに出す内容。最初に max 件を見せ、残りは rest(「ほか N件」で展開)。
+ * max に Infinity を渡すと全件(--all)。
+ */
 export function buildView(tasks, now = new Date(), max = MAX_ITEMS) {
   const sorted = sortPending(tasks);
-  const items = sorted.slice(0, max).map((t) => {
-    const di = dueInfo(t.due || "", now);
-    return {
-      id: String(t.id),
-      title: t.title || "(無題)",
-      due: di.txt,
-      dueCls: di.cls,
-      label: t.label === "work" || t.label === "private" ? LABELS[t.label] : "",
-      labelKey: t.label === "work" || t.label === "private" ? t.label : "",
-      hasNote: !!(t.note && String(t.note).trim()),
-    };
-  });
+  const all = sorted.map((t) => itemView(t, now));
+  const items = all.slice(0, max);
+  const rest = all.slice(items.length);
   return {
+    rest,
+    limit: Number.isFinite(max) ? max : MAX_ITEMS,
+    expanded: !Number.isFinite(max),
+    chips: dueChips(now),
     kind: "list",
     greeting: jstDate(now).hh < 11 ? "おはよう！" : jstDate(now).hh < 17 ? "こんにちは！" : "こんばんは！",
     dateLabel: dateLabel(now),

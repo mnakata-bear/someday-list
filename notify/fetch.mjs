@@ -62,3 +62,10 @@ export async function setDone(id, done, now = Date.now()) {
     return "ok";
   });
 }
+
+/** 新規タスクを追加(ID は Firestore の自動ID。アプリ本体の doc(collection).id と同じ作り方) */
+export async function addTask(data) {
+  const ref = tasksCol(await getDb()).doc();
+  await ref.set(data);
+  return ref.id;
+}
