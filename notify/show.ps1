@@ -9,6 +9,7 @@ Add-Type -Namespace SomedayNotify -Name Win -MemberDefinition @'
 [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
 [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int cmd);
 [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+[DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, int flags, int extra);
 '@
 
 $v = [IO.File]::ReadAllText($Json, [Text.Encoding]::UTF8) | ConvertFrom-Json
@@ -1025,7 +1026,12 @@ function Toggle-Mini { if ($script:mini) { Exit-Mini } else { Enter-Mini $true }
 function Bring-Front {
   if ($w.WindowState -eq 'Minimized') { $w.WindowState = 'Normal' }
   $w.Topmost = $true
-  if (-not $script:quiet) { $h = (New-Object Windows.Interop.WindowInteropHelper($w)).Handle; [SomedayNotify.Win]::SetForegroundWindow($h) | Out-Null; $w.Activate() | Out-Null }
+  if (-not $script:quiet) {
+    $h = (New-Object Windows.Interop.WindowInteropHelper($w)).Handle
+    # 別のプロセス(2つ目の起動)から頼まれたときは、そのままだと前に出られないことがある。Alt を一瞬押して前面化を許可させる
+    [SomedayNotify.Win]::keybd_event(0x12, 0, 0, 0); [SomedayNotify.Win]::keybd_event(0x12, 0, 2, 0)
+    [SomedayNotify.Win]::SetForegroundWindow($h) | Out-Null; $w.Activate() | Out-Null
+  }
   $script:t.Stop(); $script:t.Start()
 }
 # 2つ目の起動(定時)から届いた最新の一覧に入れ替える
