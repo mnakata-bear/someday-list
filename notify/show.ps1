@@ -1195,6 +1195,15 @@ $w.FindName('mCenter').Add_Click({ if ($script:mini) { Exit-Mini }; Center-Windo
 $w.FindName('mSize').Add_Click({ if ($w.FindName('sv')) { if ($script:mini) { Exit-Mini }; Reset-Size; Keep-Inside } })
 $openBtn = $w.FindName('open')
 if ($openBtn) { $openBtn.Add_Click({ Start-Process $v.appUrl; $w.Close() }) }
+# タスクバーのボタンで呼び出されたら、ほかのウィンドウより前(いちばん上)に出す
+function Raise-Window {
+  if ($w.WindowState -eq 'Minimized') { $w.WindowState = 'Normal' }
+  $keep = $script:mini -and $script:miniTop
+  $w.Topmost = $true
+  if (-not $keep) { $w.Topmost = $false }
+}
+$w.Add_Activated({ if ($script:placed) { Raise-Window } })
+$w.Add_StateChanged({ if ($script:placed -and $w.WindowState -eq 'Normal') { Raise-Window } })
 $w.Add_SizeChanged({ if ($script:placed -and -not $script:mini) { Keep-Inside } })
 
 $w.Add_Loaded({
