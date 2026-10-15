@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildView, demoTasks, MAX_ITEMS } from "./logic.mjs";
-import { fetchPendingTasks, setDone, addTask, editTask, deleteTask, KeyMissingError, DEFAULT_KEY } from "./fetch.mjs";
+import { fetchPendingTasks, fetchOrder, setOrder, setDone, addTask, editTask, deleteTask, KeyMissingError, DEFAULT_KEY } from "./fetch.mjs";
 import { makeHandler } from "./handler.mjs";
 import { acquireInstance, sendToPrimary, defaultPipeName } from "./instance.mjs";
 import { encodeB64Json } from "./proto.mjs";
@@ -27,9 +27,11 @@ function errorView(say, path, detail) {
 }
 
 async function makeView() {
-  if (args.has("--demo")) return buildView(demoTasks(), new Date(), max);
+  if (args.has("--demo")) return buildView(demoTasks(), new Date(), max, process.env.SOMEDAY_DEMO_ORDER ? JSON.parse(process.env.SOMEDAY_DEMO_ORDER) : []);   // SOMEDAY_DEMO_ORDER は確認用
   try {
-    return buildView(await fetchPendingTasks(), new Date(), max);
+    const tasks = await fetchPendingTasks();
+    const order = await fetchOrder().catch(() => []);   // 並び順が読めなくても一覧は出す
+    return buildView(tasks, new Date(), max, order);
   } catch (e) {
     if (e instanceof KeyMissingError) {
       return errorView("鍵ファイルが見つからないよ。置き場所はここ→", DEFAULT_KEY,
@@ -68,10 +70,11 @@ if (process.env.SOMEDAY_AUTOADD) psArgs.push("-AutoAdd", process.env.SOMEDAY_AUT
 if (process.env.SOMEDAY_AUTOEXPAND) psArgs.push("-AutoExpand");
 if (process.env.SOMEDAY_AUTOMINI) psArgs.push("-AutoMini");
 if (process.env.SOMEDAY_AUTOEDIT) psArgs.push("-AutoEdit", process.env.SOMEDAY_AUTOEDIT);
+if (process.env.SOMEDAY_AUTOMOVE) psArgs.push("-AutoMove", process.env.SOMEDAY_AUTOMOVE);
 if (process.env.SOMEDAY_AUTODELETE) psArgs.push("-AutoDelete", process.env.SOMEDAY_AUTODELETE);
 // show.ps1 とは1行プロトコルでやりとりする(proto.mjs)。--demo は Firestore に書き込まない
 const handle = makeHandler({
-  demo: args.has("--demo"), manual, setDone, addTask, editTask, deleteTask, loadPos, savePos,
+  demo: args.has("--demo"), manual, setDone, addTask, editTask, deleteTask, setOrder, loadPos, savePos,
   push: (l) => reply(l),
   now: () => Date.now(), log: (s) => console.error(s),
 });

@@ -4,6 +4,7 @@ rules_version = '2';
 //   spaces/home/tasks/{taskId}   タスク
 //   spaces/home/meta/settings    見た目の設定
 //   spaces/home/meta/stats       スタンプの累計
+//   spaces/home/meta/order       手動の並び順 { ids: [taskId...], updatedAt }(デスクトップ通知も使う)
 // 許可リストのメール(確認済み)でログインしていれば、どのアカウントでも spaces/home を読み書きできる(uid は問わない)。
 // 旧データ users/{uid}/... は、共有スペースへの移行用に「本人の read と delete」だけ残す(書き込みは不可)。
 // それ以外はすべて拒否。
@@ -60,6 +61,15 @@ service cloud.firestore {
           && request.resource.data.stampTotal is int
           && request.resource.data.stampTotal >= 0;
         allow delete: if isMember();
+      }
+
+      match /meta/order {
+        allow read, delete: if isMember();
+        allow create, update: if isMember()
+          && request.resource.data.keys().hasOnly(['ids', 'updatedAt'])
+          && request.resource.data.ids is list
+          && request.resource.data.ids.size() <= 1000
+          && request.resource.data.updatedAt is int;
       }
     }
 

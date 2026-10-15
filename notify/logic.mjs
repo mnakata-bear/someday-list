@@ -93,7 +93,7 @@ export function dueChips(now = new Date()) {
  * ウィンドウに出す内容。最初に max 件を見せ、残りは rest(「ほか N件」で展開)。
  * max に Infinity を渡すと全件(--all)。
  */
-export function buildView(tasks, now = new Date(), max = MAX_ITEMS) {
+export function buildView(tasks, now = new Date(), max = MAX_ITEMS, order = []) {
   const sorted = sortPending(tasks);
   const all = sorted.map((t) => itemView(t, now));
   const items = all.slice(0, max);
@@ -104,6 +104,7 @@ export function buildView(tasks, now = new Date(), max = MAX_ITEMS) {
     expanded: !Number.isFinite(max),
     chips: dueChips(now),
     kind: "list",
+    order: Array.isArray(order) ? order : [],
     greeting: jstDate(now).hh < 11 ? "おはよう！" : jstDate(now).hh < 17 ? "こんにちは！" : "こんばんは！",
     dateLabel: dateLabel(now),
     timeLabel: (() => { const t = jstDate(now); return `${String(t.hh).padStart(2, "0")}:${String(t.mm).padStart(2, "0")}`; })(),

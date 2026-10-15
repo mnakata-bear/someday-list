@@ -59,6 +59,10 @@ export function makeHandler(deps) {
         return `EDITERR ${cmd.req} save`;
       }
     }
+    if (cmd.type === "order") {
+      try { if (!deps.demo) await deps.setOrder(cmd.ids); } catch (e) { deps.log?.(`並び順を保存できません: ${e?.message ?? e}`); }
+      return null;
+    }
     if (cmd.type === "delete") { deferred.schedule(cmd.id); return null; }
     if (cmd.type === "undelete") return deferred.undo(cmd.id) ? null : `UNDOERR ${cmd.id}`;
     if (cmd.type === "place") {

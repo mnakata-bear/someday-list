@@ -25,6 +25,9 @@ export interface Store {
   /** 設定。未保存なら null */
   subscribeSettings(cb: (s: Settings | null) => void): () => void;
   saveSettings(s: Settings): void;
+  /** 手動の並び順(全タスクの id)。空 = 手動順なし(期限順) */
+  subscribeOrder(cb: (ids: string[]) => void): () => void;
+  saveOrder(ids: string[]): void;
   dispose(): void;
 }
 

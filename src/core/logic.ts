@@ -42,6 +42,62 @@ export function sortTasks(ts: Task[]): Task[] {
     (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 
+/* ---------- 手動の並び順(spaces/home/meta/order の ids) ---------- */
+export const ORDER_MAX = 1000;
+export const ORDER_ID_MAX = 64;
+
+/** 保存された ids を整える。文字列(64文字以内)だけ・重複なし・最大1000件。壊れた値は [] */
+export function normalizeOrder(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  for (const x of raw) {
+    if (typeof x === "string" && x && x.length <= ORDER_ID_MAX && !seen.has(x)) seen.add(x);
+    if (seen.size >= ORDER_MAX) break;
+  }
+  return [...seen];
+}
+
+/**
+ * 手動順つきの並び順。未完了→完了のグループは維持し、グループの中では order の並びを優先する。
+ * order に載っていない(新しく追加された)タスクは、そのグループの先頭に sortTasks 順で置く。
+ * order にあって存在しないタスクは無視。order が空なら sortTasks と同じ。
+ */
+export function sortTasksManual(ts: Task[], order: string[]): Task[] {
+  const base = sortTasks(ts);
+  if (!order.length) return base;
+  const pos = new Map<string, number>();
+  order.forEach((id, i) => { if (!pos.has(id)) pos.set(id, i); });
+  const group = (done: boolean) => {
+    const g = base.filter((t) => t.done === done);
+    return [...g.filter((t) => !pos.has(t.id)), ...g.filter((t) => pos.has(t.id)).sort((a, b) => pos.get(a.id)! - pos.get(b.id)!)];
+  };
+  return [...group(false), ...group(true)];
+}
+
+/** 見えている一覧(visible)で、id を同じグループ(未完了/完了)の to 番目へ動かした並び(id の配列)。範囲外は端に寄せる */
+export function moveTaskId(visible: Task[], id: string, to: number): string[] {
+  const cur = visible.find((t) => t.id === id);
+  if (!cur) return visible.map((t) => t.id);
+  const group = visible.filter((t) => t.done === cur.done).map((t) => t.id);
+  group.splice(group.indexOf(id), 1);
+  group.splice(Math.max(0, Math.min(group.length, to)), 0, id);
+  let k = 0;
+  return visible.map((t) => (t.done === cur.done ? group[k++] : t.id));
+}
+
+/**
+ * 絞り込み中でも使える保存用の ids。今の全体順のうち、見えている項目が占める場所に、新しい見えている順(visibleIds)を入れ直す。
+ * 見えていない項目の位置は変えない。全タスクの id(完了を含む)を返す(最大 ORDER_MAX 件)。
+ */
+export function mergeVisibleOrder(all: Task[], order: string[], visibleIds: string[]): string[] {
+  const full = sortTasksManual(all, order).map((t) => t.id);
+  const fullSet = new Set(full);
+  const v = visibleIds.filter((id) => fullSet.has(id));
+  const vs = new Set(v);
+  let k = 0;
+  return full.map((id) => (vs.has(id) ? v[k++] : id)).slice(0, ORDER_MAX);
+}
+
 export function taskStats(ts: Task[]) {
   const d = ts.filter((t) => t.done).length;
   return { d, all: ts.length, left: ts.length - d, pct: ts.length ? Math.round((d / ts.length) * 100) : 0 };

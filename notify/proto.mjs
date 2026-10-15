@@ -5,6 +5,7 @@
 //   ADD <req> <base64(JSON)>       新規追加 {title, due, label}(req は返事を対応づけるための番号)
 //   EDIT <req> <base64(JSON)>      編集 {id, title?, due?, note?, label?, ca?}(更新するのは渡した項目だけ。done は変えない)
 //   DELETE <id> / UNDELETE <id>    削除(6秒ほど保留。UNDELETE で取り消し。閉じるときに確定)
+//   ORDER <base64(JSON)>           手で並べた順を保存 {ids:[...]}(画面に出している行の順。空=期限順に戻す)
 //   PLACE <base64(JSON)>           出す位置を聞く {sig, screens:[{x,y,w,h}], win:{w,h}, center:{x,y}}
 //   STATE <base64(JSON)>           位置・大きさ・展開状態を保存 {x, y, sig, w, h, expanded, mini, mx, my, miniTop}
 //                                  (x,y が null=中央に出す / w,h が null=元の大きさ / mini=ミニ表示か、mx,my=ミニの位置)
@@ -45,6 +46,11 @@ export function parseLine(line) {
     return input && typeof input === "object" && typeof input.id === "string" && ID_RE.test(input.id) ? { type: "edit", req: a, input } : null;
   }
   if ((cmd === "DELETE" || cmd === "UNDELETE") && parts.length === 2 && ID_RE.test(a)) return { type: cmd === "DELETE" ? "delete" : "undelete", id: a };
+  if (cmd === "ORDER" && parts.length === 2) {
+    const p = decodeB64Json(a);
+    if (!p || !Array.isArray(p.ids)) return null;
+    return { type: "order", ids: p.ids.filter((x) => typeof x === "string" && ID_RE.test(x)).slice(0, 1000) };
+  }
   if (cmd === "PLACE" && parts.length === 2) {
     const env = decodeB64Json(a);
     return env && typeof env === "object" ? { type: "place", env } : null;

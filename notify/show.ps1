@@ -2,7 +2,7 @@
 # -Json: 表示内容(index.mjs が作る)  -Icon: ペンギンのアイコン PNG  -Shot: 見た目確認用(画面を PNG 保存して閉じる)
 # 確認用(マウスを動かさずに操作する。-Shot のときはフォーカスを取らない): -AutoMini ミニ表示にする / -AutoSeq "0,1,0" 行のチェックを順に押す / -AutoAdd "タイトル|期限キー|ラベル;..." 追加 / -AutoExpand 「ほか N件」を開く / -AutoEdit "行|タイトル|期限|ラベル(0-2)|メモ" 編集して保存 / -AutoDelete "行" 削除
 # node とは1行プロトコルでやりとりする(詳しくは proto.mjs)。
-param([Parameter(Mandatory)][string]$Json, [string]$Icon, [string]$Shot, [string]$AutoSeq, [string]$AutoAdd, [switch]$AutoExpand, [switch]$AutoMini, [string]$AutoEdit, [string]$AutoDelete)
+param([Parameter(Mandatory)][string]$Json, [string]$Icon, [string]$Shot, [string]$AutoSeq, [string]$AutoAdd, [switch]$AutoExpand, [switch]$AutoMini, [string]$AutoEdit, [string]$AutoDelete, [string]$AutoMove)
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, System.Drawing, System.Windows.Forms
 Add-Type -Namespace SomedayNotify -Name Win -MemberDefinition @'
@@ -47,21 +47,24 @@ function New-Row($it) {
 <Grid $ns>
   <Grid x:Name='sep' Height='2' ClipToBounds='True' VerticalAlignment='Top'><Line X1='0' Y1='1' X2='1600' Y2='1' Stroke='$dot' StrokeThickness='2' StrokeDashArray='0.1 2' StrokeDashCap='Round'/></Grid>
   <Grid x:Name='nm' Margin='2,6,2,6'>
-    <Grid.ColumnDefinitions><ColumnDefinition Width='44'/><ColumnDefinition Width='*'/><ColumnDefinition Width='Auto' MinWidth='52'/><ColumnDefinition Width='Auto'/></Grid.ColumnDefinitions>
-    <Border x:Name='c' Width='44' Height='44' Background='Transparent' Cursor='Hand' ToolTip='押すと完了(もう一度で元に戻す)' VerticalAlignment='Center'>
+    <Grid.ColumnDefinitions><ColumnDefinition Width='16'/><ColumnDefinition Width='44'/><ColumnDefinition Width='*'/><ColumnDefinition Width='Auto' MinWidth='52'/><ColumnDefinition Width='Auto'/></Grid.ColumnDefinitions>
+    <Border x:Name='gr' Width='16' Height='44' Background='Transparent' Cursor='SizeAll' ToolTip='つかんで上下に動かす' VerticalAlignment='Center' Opacity='0.3'>
+      <Path Width='10' Height='16' Stretch='Uniform' Stroke='$mute' StrokeThickness='2.4' StrokeStartLineCap='Round' StrokeEndLineCap='Round' Data='M2,2 L2,2 M8,2 L8,2 M2,8 L2,8 M8,8 L8,8 M2,14 L2,14 M8,14 L8,14'/>
+    </Border>
+    <Border x:Name='c' Grid.Column='1' Width='44' Height='44' Background='Transparent' Cursor='Hand' ToolTip='押すと完了(もう一度で元に戻す)' VerticalAlignment='Center'>
       <Grid Width='24' Height='24'>
         <Ellipse x:Name='cr' Stroke='$ring' StrokeThickness='2' Fill='White'/>
         <Path x:Name='ck' Data='M6.5,12.5 L10.5,16.5 L17.5,8.5' Stroke='White' StrokeThickness='2.6' StrokeStartLineCap='Round' StrokeEndLineCap='Round' StrokeLineJoin='Round' Visibility='Hidden'/>
       </Grid>
     </Border>
-    <StackPanel x:Name='tx' Grid.Column='1' VerticalAlignment='Center' Margin='4,0,0,0'>
+    <StackPanel x:Name='tx' Grid.Column='2' VerticalAlignment='Center' Margin='4,0,0,0'>
       <StackPanel Orientation='Horizontal'>
         <TextBox x:Name='t' $ro FontSize='14.5' FontWeight='ExtraBold' Foreground='$ink' MaxWidth='$titleMax'/>
         $memo
       </StackPanel>
       <TextBox x:Name='d' $ro FontSize='12' FontWeight='$dueW' Foreground='$dueC'/>
     </StackPanel>
-    <Grid Grid.Column='2' VerticalAlignment='Center'>
+    <Grid Grid.Column='3' VerticalAlignment='Center'>
       $seal
       <Grid x:Name='s' Width='46' Height='46' HorizontalAlignment='Center' Visibility='Collapsed' IsHitTestVisible='False' RenderTransformOrigin='0.5,0.5'>
         <Grid.RenderTransform><TransformGroup><ScaleTransform/><RotateTransform Angle='-14'/></TransformGroup></Grid.RenderTransform>
@@ -70,7 +73,7 @@ function New-Row($it) {
         <TextBlock Text='済' FontFamily='Yu Mincho, MS Mincho' FontSize='19' FontWeight='Bold' Foreground='$stampC' HorizontalAlignment='Center' VerticalAlignment='Center'/>
       </Grid>
     </Grid>
-    <StackPanel x:Name='ib' Grid.Column='3' Orientation='Horizontal' VerticalAlignment='Center' Opacity='0.38'>
+    <StackPanel x:Name='ib' Grid.Column='4' Orientation='Horizontal' VerticalAlignment='Center' Opacity='0.38'>
       <Border x:Name='ed' Width='30' Height='44' Background='Transparent' Cursor='Hand' ToolTip='編集'>
         <Path Width='16' Height='16' Stretch='Uniform' Stroke='$mute' StrokeThickness='1.7' StrokeLineJoin='Round' StrokeStartLineCap='Round' StrokeEndLineCap='Round' Data='M3,13 L3.7,10 L11,2.7 L13.3,5 L6,12.3 Z M9.6,4.1 L11.9,6.4'/>
       </Border>
@@ -80,6 +83,8 @@ function New-Row($it) {
     </StackPanel>
   </Grid>
   <Grid x:Name='eh' Margin='2,8,2,8' Visibility='Collapsed'/>
+  <Border x:Name='dl' Height='3' CornerRadius='2' Background='$purple' VerticalAlignment='Top' Margin='6,0,6,0' Visibility='Collapsed' IsHitTestVisible='False'/>
+  <Border x:Name='dlb' Height='3' CornerRadius='2' Background='$purple' VerticalAlignment='Bottom' Margin='6,0,6,0' Visibility='Collapsed' IsHitTestVisible='False'/>
 </Grid>
 "@
   $el = [Windows.Markup.XamlReader]::Parse($x)
@@ -93,11 +98,18 @@ function New-Row($it) {
   $b2 = $el.FindName('del'); $b2.Tag = [string]$it.id
   $b2.Add_PreviewMouseLeftButtonDown({ param($s, $e) $e.Handled = $true; Delete-Row ([string]$s.Tag) })
   # 編集・削除のアイコンは、行にマウスを乗せると濃くなる
-  $el.Add_MouseEnter({ param($s, $e) $s.FindName('ib').Opacity = 0.95 })
-  $el.Add_MouseLeave({ param($s, $e) $s.FindName('ib').Opacity = 0.38 })
+  $el.Add_MouseEnter({ param($s, $e) $s.FindName('ib').Opacity = 0.95; $s.FindName('gr').Opacity = 0.9 })
+  $el.Add_MouseLeave({ param($s, $e) $s.FindName('ib').Opacity = 0.38; if (-not $script:drag) { $s.FindName('gr').Opacity = 0.3 } })
+  # 左端のつかみ: つかんで上下に動かすと並びを変えられる
+  $gr = $el.FindName('gr'); $gr.Tag = [string]$it.id
+  $gr.Add_PreviewMouseLeftButtonDown({ param($s, $e) $e.Handled = $true; Start-Drag $s $e })
+  $gr.Add_PreviewMouseMove({ param($s, $e) Move-Drag $s $e })
+  $gr.Add_PreviewMouseLeftButtonUp({ param($s, $e) $e.Handled = $true; End-Drag $s })
+  $gr.Add_LostMouseCapture({ param($s, $e) End-Drag $s })
   @{ id = [string]$it.id; key = [string]$it.key; over = $over; done = $false; pending = $false; deleted = $false; el = $el
      nm = $el.FindName('nm'); eh = $el.FindName('eh'); dueYmd = [string]$it.dueYmd; note = [string]$it.note; labelKey = [string]$it.labelKey; ca = $it.ca; titleRaw = [string]$it.title
      ring = $el.FindName('cr'); ck = $el.FindName('ck'); stamp = $el.FindName('s'); tx = $el.FindName('tx')
+     gr = $gr; dl = $el.FindName('dl'); dlb = $el.FindName('dlb')
      title = $el.FindName('t'); seal = $el.FindName('g'); sep = $el.FindName('sep') }
 }
 
@@ -266,6 +278,7 @@ $xaml = @"
       <Separator/>
       <MenuItem x:Name='mCenter' Header='中央に戻す'/>
       <MenuItem x:Name='mSize' Header='元の大きさに戻す'/>
+      <MenuItem x:Name='mOrder' Header='並び順を期限順に戻す' IsEnabled='False'/>
       <MenuItem x:Name='mClose' Header='閉じる'/>
     </ContextMenu>
   </Window.ContextMenu>
@@ -329,12 +342,14 @@ $script:limit = [int]$v.limit; if ($script:limit -le 0) { $script:limit = 5 }
 $script:expanded = [bool]$v.expanded
 $script:hasPos = $false
 $script:userW = $null; $script:userH = $null
-$script:titleMax = 216
+$script:titleMax = 198
 $script:mini = $false; $script:miniTop = $true; $script:mx = $null; $script:my = $null
 $script:nx = $null; $script:ny = $null
 $script:addWasOpen = $false
 $script:quiet = [bool]$Shot   # 撮影(確認用)のときはフォーカスを取らない
 $script:labIdx = 0
+$script:order = $null   # 手で並べた順(id の並び)。null=期限順
+$script:drag = $null
 
 function Update-Say {
   # のこり件数: 完了にした行・削除した行は数えない
@@ -420,9 +435,15 @@ function Toggle-Row([string]$id) {
 }
 
 # 並び順(key)どおりの位置に行を差し込む
-function Insert-Row($r, [bool]$animate) {
+function Insert-Row($r, [bool]$animate, [int]$at = -1) {
   $idx = $script:rows.Count
-  for ($i = 0; $i -lt $script:rows.Count; $i++) { if ([string]::CompareOrdinal($script:rows[$i].key, $r.key) -gt 0) { $idx = $i; break } }
+  if ($null -ne $script:order) {
+    # 手で並べているときは、新しいものは先頭、編集したものは元の位置
+    $idx = if ($at -ge 0) { [Math]::Min($at, $script:rows.Count) } else { 0 }
+    if ($at -lt 0) { $script:order = @([string]$r.id) + @($script:order) }
+  } else {
+    for ($i = 0; $i -lt $script:rows.Count; $i++) { if ([string]::CompareOrdinal($script:rows[$i].key, $r.key) -gt 0) { $idx = $i; break } }
+  }
   [void]$script:rows.Insert($idx, $r)
   $w.FindName('listP').Children.Insert($idx, $r.el)
   if (-not $script:expanded -and $idx -ge $script:limit) { $script:expanded = $true }
@@ -435,6 +456,7 @@ function Insert-Row($r, [bool]$animate) {
     $r.el.BringIntoView()
   }
   Update-Seps
+  if ($null -ne $script:order -and $at -lt 0) { Send-Order }
 }
 
 # ---------- 追加フォーム ----------
@@ -585,7 +607,7 @@ function Toggle-Expand {
 function Set-ListWidth([double]$rw) {
   $w.FindName('root').Width = $rw
   $w.Width = $rw + 48
-  $script:titleMax = [int]($rw - 214)
+  $script:titleMax = [int]($rw - 232)
   foreach ($r in $script:rows) { $r.title.MaxWidth = $script:titleMax }
 }
 # 一覧部分の高さの上限(ウィンドウが画面の高さに収まるように)
@@ -608,6 +630,101 @@ function Reset-Size {
   $w.FindName('sv').ScrollToTop()
   Apply-Size
   Save-State
+}
+
+# ---------- 手で並べ替え(左端のつかみをドラッグ) ----------
+function Update-OrderMenu { $m = $w.FindName('mOrder'); if ($m) { $m.IsEnabled = ($null -ne $script:order) } }
+# 保存した順(id の並び)どおりに行を並べる。並びにないもの(新しいもの)は先頭に、期限順で
+function Apply-Order {
+  Update-OrderMenu
+  if ($null -eq $script:order) { return }
+  $pos = @{}
+  for ($i = 0; $i -lt $script:order.Count; $i++) { $pos[[string]$script:order[$i]] = $i }
+  $sorted = @($script:rows | Sort-Object @{ e = { if ($pos.ContainsKey($_.id)) { 1 } else { 0 } } }, @{ e = { if ($pos.ContainsKey($_.id)) { [int]$pos[$_.id] } else { 0 } } }, @{ e = { $_.key } })
+  $lp = $w.FindName('listP')
+  $script:rows.Clear(); $lp.Children.Clear()
+  foreach ($r in $sorted) { [void]$script:rows.Add($r); [void]$lp.Children.Add($r.el) }
+  Apply-Rows $false
+}
+function Send-Order { Send ('ORDER ' + (To-B64 @{ ids = $(if ($null -ne $script:order) { [string[]]@($script:order) } else { [string[]]@() }) })) }
+function Current-Order { [string[]]@($script:rows | Where-Object { -not $_.deleted } | ForEach-Object { [string]$_.id }) }
+# 期限順(自動)に戻す
+function Reset-Order {
+  if ($null -eq $script:order) { return }
+  $script:order = $null
+  $tmp = @($script:rows); $lp = $w.FindName('listP')
+  $script:rows.Clear(); $lp.Children.Clear()
+  foreach ($r in $tmp) {
+    $idx = $script:rows.Count
+    for ($i = 0; $i -lt $script:rows.Count; $i++) { if ([string]::CompareOrdinal($script:rows[$i].key, $r.key) -gt 0) { $idx = $i; break } }
+    [void]$script:rows.Insert($idx, $r); $lp.Children.Insert($idx, $r.el)
+  }
+  Apply-Rows $false
+  Update-OrderMenu
+  Send-Order
+}
+function Clear-DropLines { foreach ($o in $script:rows) { $o.dl.Visibility = 'Collapsed'; $o.dlb.Visibility = 'Collapsed' } }
+function Start-Drag($grip, $e) {
+  $r = Find-Row ([string]$grip.Tag)
+  if (-not $r -or $r.deleted -or $script:editing -or $script:drag) { return }
+  $lp = $w.FindName('listP')
+  $tt = New-Object Windows.Media.TranslateTransform(0, 0)
+  $r.el.RenderTransform = $tt
+  [Windows.Controls.Panel]::SetZIndex($r.el, 50)
+  $r.el.Background = New-Object Windows.Media.SolidColorBrush([Windows.Media.ColorConverter]::ConvertFromString('#F4EFFD'))
+  $r.el.Effect = New-Object Windows.Media.Effects.DropShadowEffect -Property @{ BlurRadius = 18; ShadowDepth = 5; Direction = 270; Opacity = 0.3; Color = [Windows.Media.ColorConverter]::ConvertFromString('#281E64') }
+  $r.gr.Opacity = 1
+  $script:drag = @{ r = $r; y0 = $e.GetPosition($lp).Y; tt = $tt; before = $r }
+  [void]$grip.CaptureMouse()
+}
+function Move-Drag($grip, $e) {
+  $d = $script:drag
+  if (-not $d -or -not $grip.IsMouseCaptured) { return }
+  $lp = $w.FindName('listP'); $sv = $w.FindName('sv')
+  $y = $e.GetPosition($lp).Y
+  $d.tt.Y = $y - $d.y0
+  # 上下の端に近づいたら一覧をスクロール
+  $sy = $e.GetPosition($sv).Y
+  if ($sy -lt 24) { $sv.ScrollToVerticalOffset([Math]::Max(0, $sv.VerticalOffset - 12)) }
+  elseif ($sy -gt $sv.ActualHeight - 24) { $sv.ScrollToVerticalOffset($sv.VerticalOffset + 12) }
+  # どの行の前に入れるか(見えている行の真ん中より上にいれば、その行の前)
+  $vis = @($script:rows | Where-Object { -not $_.deleted -and $_.el.Visibility -eq 'Visible' -and $_.id -ne $d.r.id })
+  $before = $null
+  foreach ($o in $vis) {
+    $mid = $o.el.TranslatePoint((New-Object Windows.Point(0, 0)), $lp).Y + $o.el.ActualHeight / 2
+    if ($y -lt $mid) { $before = $o; break }
+  }
+  $d.before = $before
+  Clear-DropLines
+  if ($before) { $before.dl.Visibility = 'Visible' } elseif ($vis.Count -gt 0) { $vis[$vis.Count - 1].dlb.Visibility = 'Visible' }
+}
+function End-Drag($grip) {
+  $d = $script:drag
+  if (-not $d) { return }
+  $script:drag = $null
+  if ($grip.IsMouseCaptured) { $grip.ReleaseMouseCapture() }
+  $r = $d.r
+  Clear-DropLines
+  $r.el.RenderTransform = $null; $r.el.Effect = $null; $r.el.Background = $null
+  [Windows.Controls.Panel]::SetZIndex($r.el, 0)
+  $r.gr.Opacity = 0.3
+  $oldIdx = $script:rows.IndexOf($r)
+  [void]$script:rows.Remove($r)
+  if ($d.before -and $d.before.id -ne $r.id) { $idx = $script:rows.IndexOf($d.before) }
+  elseif ($d.before) { $idx = $oldIdx }
+  else {
+    # いちばん下へ: 見えている最後の行のすぐ後ろ(畳んでいる行は、その後ろのまま)
+    $idx = 0
+    for ($i = 0; $i -lt $script:rows.Count; $i++) { if (-not $script:rows[$i].deleted -and $script:rows[$i].el.Visibility -eq 'Visible') { $idx = $i + 1 } }
+  }
+  [void]$script:rows.Insert($idx, $r)
+  if ($idx -eq $oldIdx) { Update-Seps; return }
+  $lp = $w.FindName('listP')
+  $lp.Children.Remove($r.el); $lp.Children.Insert($idx, $r.el)
+  Apply-Rows $false
+  $script:order = Current-Order
+  Update-OrderMenu
+  Send-Order
 }
 
 # ---------- 編集(行の中で、「追加」と同じ部品で) ----------
@@ -762,9 +879,10 @@ function On-Edited([string]$req, $item) {
   $nr = New-Row $item
   $nr.done = $old.done
   if ($old.done) { Set-RowLook $nr $true $false }
+  $oldIdx = $script:rows.IndexOf($old)
   $w.FindName('listP').Children.Remove($old.el)
   $script:rows.Remove($old)
-  Insert-Row $nr $true
+  Insert-Row $nr $true $oldIdx
   Update-Say
 }
 function On-EditErr([string]$req, [string]$why) {
@@ -918,6 +1036,8 @@ function Load-View($nv) {
   $script:total = [int]$nv.total; $script:overdueTotal = [int]$nv.overdue; $script:anyChange = $false
   foreach ($it in @($nv.items) + @($nv.rest)) { if ($it) { $r = New-Row $it; [void]$script:rows.Add($r); $w.FindName('listP').Children.Add($r.el) | Out-Null } }
   $w.FindName('date').Text = "$($nv.dateLabel) · $($nv.timeLabel)"
+  $script:order = if ($nv.order -and @($nv.order).Count -gt 0) { [string[]]@($nv.order) } else { $null }
+  Apply-Order
   Apply-Rows $false
   Update-Say
   if (-not $script:mini) { Apply-Size }
@@ -991,6 +1111,8 @@ if ($v.kind -eq 'error') {
   foreach ($it in @($v.items)) { if ($it) { $r = New-Row $it; [void]$script:rows.Add($r); $w.FindName('listP').Children.Add($r.el) | Out-Null } }
   foreach ($it in @($v.rest)) { if ($it) { $r = New-Row $it; $r.el.Visibility = 'Collapsed'; [void]$script:rows.Add($r); $w.FindName('listP').Children.Add($r.el) | Out-Null } }
   $w.FindName('moreB').Add_PreviewMouseLeftButtonDown({ param($s, $e) $e.Handled = $true; Toggle-Expand })
+  if ($v.order -and @($v.order).Count -gt 0) { $script:order = [string[]]@($v.order) }
+  Apply-Order
   Apply-Rows $false
   # 右下のつまみで大きさを変える(幅は 430〜760、高さは画面に収まる範囲)
   $grip = $w.FindName('grip')
@@ -1068,6 +1190,7 @@ if ($v.kind -ne 'list') { $w.FindName('mMini').Visibility = 'Collapsed'; $w.Find
 $w.FindName('x').Add_Click({ $w.Close() })
 $w.FindName('close').Add_Click({ $w.Close() })
 $w.FindName('mClose').Add_Click({ $w.Close() })
+$w.FindName('mOrder').Add_Click({ Reset-Order })
 $w.FindName('mCenter').Add_Click({ if ($script:mini) { Exit-Mini }; Center-Window; Keep-Inside; $script:hasPos = $false; $script:nx = $null; Save-State })
 $w.FindName('mSize').Add_Click({ if ($w.FindName('sv')) { if ($script:mini) { Exit-Mini }; Reset-Size; Keep-Inside } })
 $openBtn = $w.FindName('open')
@@ -1116,6 +1239,8 @@ $w.Add_Loaded({
       if ($f.Count -ge 6 -and $f[5] -eq 'save') { $script:auto.Enqueue({ Do-Edit }) }
     }
   }
+  # 並べ替えの疑似操作(確認用): "移す行|入れる前の行(空=末尾)" を ; でつなぐ。ドラッグを離したときと同じ処理を通す
+  if ($AutoMove) { foreach ($a in ($AutoMove -split ';')) { $f = $a -split '\|'; $script:auto.Enqueue([scriptblock]::Create("`$r = `$script:rows[$([int]$f[0])]; `$b = $(if ($f[1] -ne '') { "`$script:rows[$([int]$f[1])]" } else { '$null' }); `$script:drag = @{ r = `$r; before = `$b; tt = (New-Object Windows.Media.TranslateTransform(0,0)) }; End-Drag `$r.gr")) } }
   if ($AutoDelete) { foreach ($a in ($AutoDelete -split ',')) { $script:auto.Enqueue([scriptblock]::Create("Delete-Row `$script:rows[$([int]$a)].id")) } }
   if ($AutoSeq) { foreach ($s in ($AutoSeq -split ',')) { $script:auto.Enqueue([scriptblock]::Create("Toggle-Row `$script:rows[$([int]$s)].id")) } }
   $delay = 1200 + 900 * $script:auto.Count

@@ -10,3 +10,4 @@ export const mic = s('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M
 export const close = s('<path d="M6 6l12 12M18 6L6 18"/>');
 export const trash = s('<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>', 16);
 export const note = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 2.5h7l3 3v8H3z"/><path d="M5.5 7.5h5M5.5 10h3.5"/></svg>';
+export const grip = '<svg width="12" height="18" viewBox="0 0 12 18" fill="currentColor" aria-hidden="true"><circle cx="3.5" cy="3.5" r="1.5"/><circle cx="8.5" cy="3.5" r="1.5"/><circle cx="3.5" cy="9" r="1.5"/><circle cx="8.5" cy="9" r="1.5"/><circle cx="3.5" cy="14.5" r="1.5"/><circle cx="8.5" cy="14.5" r="1.5"/></svg>';

@@ -1,9 +1,10 @@
 import type { NewTaskInput, Settings, Task, TaskPatch } from "../core/types";
-import { applyStampDelta, diffTasks, normalizeLabel, normalizeSettings, validateDue, validateLabel, validateNote, validateTitle } from "../core/logic";
+import { applyStampDelta, diffTasks, normalizeLabel, normalizeOrder, normalizeSettings, validateDue, validateLabel, validateNote, validateTitle } from "../core/logic";
 import type { Store, StoreState } from "./types";
 
 export const TASKS_KEY = "someday-tasks-v1";
 export const SETTINGS_KEY = "someday-settings-v1";
+export const ORDER_KEY = "someday-order-v1";
 
 interface Saved { tasks: Task[]; stampTotal: number }
 
@@ -52,6 +53,7 @@ export class LocalStore implements Store {
   private data: Saved;
   private subs = new Set<(s: StoreState) => void>();
   private setSubs = new Set<(s: Settings | null) => void>();
+  private orderSubs = new Set<(ids: string[]) => void>();
   private onStorage = (e: StorageEvent) => {
     if (e.key === TASKS_KEY) {
       const prev = this.data.tasks;
@@ -60,6 +62,9 @@ export class LocalStore implements Store {
     } else if (e.key === SETTINGS_KEY) {
       const s = this.readSettings();
       this.setSubs.forEach((cb) => cb(s));
+    } else if (e.key === ORDER_KEY) {
+      const ids = this.readOrder();
+      this.orderSubs.forEach((cb) => cb(ids));
     }
   };
 
@@ -146,9 +151,28 @@ export class LocalStore implements Store {
     try { this.storage.setItem(SETTINGS_KEY, JSON.stringify(normalizeSettings(s))); } catch { /* 容量不足などは無視 */ }
   }
 
+  private readOrder(): string[] {
+    try {
+      const raw = this.storage.getItem(ORDER_KEY);
+      return raw ? normalizeOrder((JSON.parse(raw) as { ids?: unknown } | null)?.ids) : [];
+    } catch { return []; }
+  }
+  subscribeOrder(cb: (ids: string[]) => void) {
+    this.orderSubs.add(cb);
+    cb(this.readOrder());
+    return () => { this.orderSubs.delete(cb); };
+  }
+  /** Firestore の spaces/home/meta/order と同じ形 { ids, updatedAt } で持つ */
+  saveOrder(ids: string[]) {
+    const v = normalizeOrder(ids);
+    try { this.storage.setItem(ORDER_KEY, JSON.stringify({ ids: v, updatedAt: this.now() })); } catch { /* 容量不足などは無視 */ }
+    this.orderSubs.forEach((cb) => cb(v));
+  }
+
   dispose() {
     this.subs.clear();
     this.setSubs.clear();
+    this.orderSubs.clear();
     if (typeof window !== "undefined") window.removeEventListener("storage", this.onStorage);
   }
 }

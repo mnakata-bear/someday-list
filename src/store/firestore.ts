@@ -3,7 +3,7 @@ import {
   type DocumentData, type Firestore, type QueryDocumentSnapshot,
 } from "firebase/firestore";
 import type { NewTaskInput, Settings, Task, TaskPatch } from "../core/types";
-import { applyStampDelta, diffTasks, normalizeLabel, normalizeSettings } from "../core/logic";
+import { applyStampDelta, diffTasks, normalizeLabel, normalizeOrder, normalizeSettings } from "../core/logic";
 import type { ErrorSink, Store, StoreState } from "./types";
 import { buildTask, cleanPatch } from "./local";
 
@@ -15,6 +15,7 @@ export const SPACE = "spaces/home";
  *   spaces/home/tasks/{taskId}  … タスク
  *   spaces/home/meta/settings   … 見た目の設定
  *   spaces/home/meta/stats      … スタンプの累計
+ *   spaces/home/meta/order      … 手動の並び順 { ids: string[], updatedAt }(デスクトップ通知も読み書きする)
  * オフライン中の書き込みは端末内のキャッシュ(persistentLocalCache)に入り、復帰時に送られる。
  * そのため書き込みの Promise は待たずに、onSnapshot の結果で画面を更新する。
  */
@@ -65,6 +66,7 @@ export class FirestoreStore implements Store {
   private taskRef(id: string) { return doc(this.db, SPACE, "tasks", id); }
   private statsRef() { return doc(this.db, SPACE, "meta", "stats"); }
   private settingsRef() { return doc(this.db, SPACE, "meta", "settings"); }
+  private orderRef() { return doc(this.db, SPACE, "meta", "order"); }
 
   private emit(remote: StoreState["remote"]) {
     const s: StoreState = {
@@ -133,6 +135,18 @@ export class FirestoreStore implements Store {
   saveSettings(s: Settings) {
     const v = normalizeSettings(s);
     setDoc(this.settingsRef(), { layout: v.layout, theme: v.theme, wp: v.wp, stamp: v.stamp }).catch(this.fail("設定をクラウドに保存できませんでした"));
+  }
+
+  subscribeOrder(cb: (ids: string[]) => void) {
+    const un = onSnapshot(this.orderRef(), (snap) => cb(snap.exists() ? normalizeOrder(snap.data()?.ids) : []),
+      (err) => this.onError("並び順の読み込みに失敗しました", err));
+    this.unsubs.push(un);
+    return un;
+  }
+
+  /** ids が空 = 手動順なし(期限順に戻す)。ドキュメントは消さず ids=[] で残す */
+  saveOrder(ids: string[]) {
+    setDoc(this.orderRef(), { ids: normalizeOrder(ids), updatedAt: this.now() }).catch(this.fail("並び順をクラウドに保存できませんでした"));
   }
 
   dispose() {

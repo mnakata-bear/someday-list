@@ -228,3 +228,24 @@ describe("handler: 追加と完了", () => {
     expect(await h("DONE abc")).toBe("ERR abc");
   });
 });
+
+describe("ORDER(手で並べた順)", () => {
+  it("ids を解析し、不正な id は捨てる", () => {
+    expect(parseLine(`ORDER ${encodeB64Json({ ids: ["a1", "b_2", "bad id", 5, "../x"] })}`)).toEqual({ type: "order", ids: ["a1", "b_2"] });
+    expect(parseLine(`ORDER ${encodeB64Json({ ids: [] })}`)).toEqual({ type: "order", ids: [] });
+    expect(parseLine(`ORDER ${encodeB64Json({ nope: 1 })}`)).toBeNull();
+  });
+  it("buildView は order をそのまま持つ(無ければ空)", async () => {
+    const { buildView } = await import("../logic.mjs");
+    expect(buildView([], new Date(), 5, ["x", "y"]).order).toEqual(["x", "y"]);
+    expect(buildView([], new Date()).order).toEqual([]);
+  });
+  it("handler は setOrder を呼ぶ(--demo は呼ばない)", async () => {
+    const { makeHandler } = await import("../handler.mjs");
+    const calls = [];
+    const line = `ORDER ${encodeB64Json({ ids: ["a", "b"] })}`;
+    await makeHandler({ now: () => 1, setOrder: async (ids) => calls.push(ids) })(line);
+    await makeHandler({ demo: true, now: () => 1, setOrder: async (ids) => calls.push(ids) })(line);
+    expect(calls).toEqual([["a", "b"]]);
+  });
+});

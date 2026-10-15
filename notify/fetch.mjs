@@ -36,11 +36,33 @@ export async function getDb() {
 }
 
 const tasksCol = (db) => db.collection("spaces").doc("home").collection("tasks");
+const orderDoc = (db) => db.collection("spaces").doc("home").collection("meta").doc("order");
 const statsDoc = (db) => db.collection("spaces").doc("home").collection("meta").doc("stats");
 
 export async function fetchPendingTasks() {
   const snap = await tasksCol(await getDb()).where("done", "==", false).get();
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+/** 手で並べた順(meta/order の ids)。無ければ空 */
+export async function fetchOrder() {
+  const snap = await orderDoc(await getDb()).get();
+  const ids = snap.exists ? snap.data().ids : [];
+  return Array.isArray(ids) ? ids.filter((x) => typeof x === "string") : [];
+}
+
+/** 並び順を保存。ids は画面に出している行の順。出していないもの(完了済みなど)は、元の順のまま後ろに残す。空配列=期限順に戻す */
+export async function setOrder(ids, now = Date.now()) {
+  const db = await getDb();
+  const ref = orderDoc(db);
+  if (ids.length === 0) { await ref.delete(); return; }
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const old = snap.exists && Array.isArray(snap.data().ids) ? snap.data().ids : [];
+    const seen = new Set(ids);
+    const merged = [...ids, ...old.filter((x) => typeof x === "string" && !seen.has(x))].slice(0, 1000);
+    tx.set(ref, { ids: merged, updatedAt: Math.floor(now) });
+  });
 }
 
 /**

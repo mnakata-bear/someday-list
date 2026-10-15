@@ -3,7 +3,7 @@ import type { Label, Settings, Task } from "./core/types";
 import { LABELS } from "./core/types";
 import { LAYOUTS, STAMPS, THEMES, WPS, stampMark } from "./core/themes";
 import {
-  NOTE_MAX, dueInfo, esc, filterTasks, firstLine, labelCounts, linkify, md, normalizeFilter, normalizeSettings, sortTasks, stampCardState, taskStats, upcoming,
+  NOTE_MAX, dueInfo, esc, filterTasks, firstLine, labelCounts, linkify, md, mergeVisibleOrder, moveTaskId, normalizeFilter, normalizeSettings, sortTasksManual, stampCardState, taskStats, upcoming,
   validateDue, validateLabel, validateNote, validateTitle, type LabelFilter,
 } from "./core/logic";
 import { parseSpoken } from "./core/spoken";
@@ -36,8 +36,11 @@ const localStore = new LocalStore();
 let store: Store = localStore;
 let unsubStore: (() => void) | null = null;
 let unsubSettings: (() => void) | null = null;
+let unsubOrder: (() => void) | null = null;
 let state: StoreState = { tasks: [], stampTotal: 0, ready: false, pending: false, remote: null };
 let settings: Settings = normalizeSettings(null);
+/** 手動の並び順(全タスクの id)。空 = 手動順なし(期限順) */
+let order: string[] = [];
 {
   let first: Settings | null = null;
   localStore.subscribeSettings((s) => { first = s; })();
@@ -78,7 +81,7 @@ let gateBusy = false;
 const EMPTY_STATE: StoreState = { tasks: [], stampTotal: 0, ready: false, pending: false, remote: null };
 
 /** チェック時のスタンプ押下・他端末からの変更のハイライト(期限つき) */
-const fx = new Map<string, { kind: "pop" | "flash" | "lbl"; until: number }>();
+const fx = new Map<string, { kind: "pop" | "flash" | "lbl" | "drop"; until: number }>();
 let cardPop: { from: number; until: number } | null = null;
 
 /* ================= テーマ ================= */
@@ -187,9 +190,11 @@ function itemHTML(t: Task, now: number) {
     ? `<span class="stamp${pop}" aria-label="完了スタンプ"><b>${STAMPS[settings.stamp].t}</b><i>${t.doneAt ? md(new Date(t.doneAt)) : ""}</i></span>` : "";
   const nl = t.note ? firstLine(t.note) : "";
   const lpop = f && f.kind === "lbl" && f.until > now ? " lpop" : "";
+  const landed = f && f.kind === "drop" && f.until > now ? " landed" : "";
   const chip = t.label ? `<span class="lchip ${t.label}${lpop}" data-testid="label-chip">${LABELS[t.label]}</span>` : "";
   const noteRow = t.note ? `<span class="notex" title="メモ">${I.note}<span class="nt">${linkify(nl) || "メモあり"}</span></span>` : "";
-  return `<li class="item${t.done ? " done" : ""}${flash}" data-task="${esc(t.id)}">
+  return `<li class="item${t.done ? " done" : ""}${flash}${landed}" data-task="${esc(t.id)}">
+    <button type="button" class="grip" data-grip="${esc(t.id)}" title="ドラッグで並べ替え" aria-label="「${esc(t.title)}」を並べ替える(つかんで動かす。または上下キーで1つずつ移動)">${I.grip}</button>
     <label class="ck"><input type="checkbox" data-id="${esc(t.id)}" ${t.done ? "checked" : ""} aria-label="${esc(t.title)}を完了にする"><span>${I.ckSvg}</span></label>
     <div class="ibody" data-open="${esc(t.id)}"><div class="title">${esc(t.title)}</div><div class="meta"><span class="mrow"><span class="due ${di.cls}">${di.cls === "none" ? "" : I.cal}${di.txt}</span>${chip}</span>${noteRow}</div></div>
     <button type="button" class="ebtn" data-edit="${esc(t.id)}" aria-label="「${esc(t.title)}」を編集">${I.pencil}</button>${stamp}</li>`;
@@ -199,14 +204,20 @@ const addCta = `<button type="button" class="addcta" data-add-open>＋ やるこ
 const emptyHTML = `<div class="empty"><b>まっさら！</b>いつかやりたいことを、気軽に書いておきましょう${addCta}</div>`;
 const loadingHTML = `<div class="loading" role="status"><span class="spin"></span>読み込み中…</div>`;
 
+/** 画面に出す順(絞り込み + 手動順。未完了→完了のグループは維持) */
+function visibleList(): Task[] {
+  return sortTasksManual(filterTasks(state.tasks, filter), order);
+}
+
 function listHTML(now: number) {
   if (!authResolved || !state.ready) return loadingHTML;
   const c = labelCounts(state.tasks);
   const tabs = `<div class="ftabs" role="group" aria-label="ラベルで絞り込み" data-testid="ftabs">${([["all", "すべて"], ["work", LABELS.work], ["private", LABELS.private]] as const)
     .map(([k, n]) => `<button type="button" class="lpill ${k}" data-flt="${k}" aria-pressed="${filter === k}">${n}<em>${c[k]}</em></button>`).join("")}</div>`;
-  const l = sortTasks(filterTasks(state.tasks, filter));
+  const l = visibleList();
   const empty = state.tasks.length ? `<div class="empty"><b>${filter === "all" ? "まっさら！" : `${LABELS[filter]}のやることはまだありません`}</b>追加するときに、ラベルを付けられます${addCta}</div>` : emptyHTML;
-  return tabs + (l.length ? `<ul class="list">${l.map((t) => itemHTML(t, now)).join("")}</ul>` : empty);
+  const reset = order.length ? `<button type="button" class="resetorder" data-order-reset title="手動の並びをやめて、期限の近い順に戻します">期限順に戻す</button>` : "";
+  return `<div class="fbar">${tabs}${reset}</div>` + (l.length ? `<ul class="list">${l.map((t) => itemHTML(t, now)).join("")}</ul>` : empty);
 }
 
 function stampHTML(now: number) {
@@ -337,10 +348,11 @@ document.addEventListener("keydown", (e) => {
 function fill() {
   const now = Date.now();
   const active = document.activeElement as HTMLElement | null;
-  const focusId = active?.matches?.("input[data-id]") ? active.dataset.id : active?.matches?.("[data-flt]") ? "f:" + active.dataset.flt : active?.matches?.("[data-edit]") ? "e:" + active.dataset.edit : null;
+  const focusId = active?.matches?.("input[data-id]") ? active.dataset.id : active?.matches?.("[data-flt]") ? "f:" + active.dataset.flt : active?.matches?.("[data-edit]") ? "e:" + active.dataset.edit : active?.matches?.("[data-grip]") ? "g:" + active.dataset.grip : null;
   [...shell.querySelectorAll<HTMLElement>("[data-r]"), ...(gate ? [] : drawerEl.querySelectorAll<HTMLElement>("[data-r]"))].forEach((el) => {
     const fn = REGIONS[el.dataset.r!];
     if (!fn) return;
+    if (drag && el.dataset.r === "list") return; // ドラッグ中は一覧を作り直さない(つかんだ項目が消えないように)
     const html = fn(now);
     if (lastHTML.get(el) === html) return; // 同じ内容なら触らない(アニメーションが途切れないように)
     lastHTML.set(el, html);
@@ -353,7 +365,7 @@ function fill() {
     b.title = filter !== "all" ? "絞り込み中は、そのラベルで追加されます" : "";
   });
   if (focusId && !shell.contains(active)) {
-    const sel = focusId.startsWith("f:") ? `[data-flt="${CSS.escape(focusId.slice(2))}"]` : focusId.startsWith("e:") ? `[data-edit="${CSS.escape(focusId.slice(2))}"]` : `input[data-id="${CSS.escape(focusId)}"]`;
+    const sel = focusId.startsWith("f:") ? `[data-flt="${CSS.escape(focusId.slice(2))}"]` : focusId.startsWith("g:") ? `[data-grip="${CSS.escape(focusId.slice(2))}"]` : focusId.startsWith("e:") ? `[data-edit="${CSS.escape(focusId.slice(2))}"]` : `input[data-id="${CSS.escape(focusId)}"]`;
     shell.querySelector<HTMLElement>(sel)?.focus();
   }
 }
@@ -399,6 +411,7 @@ function onStoreError(msg: string, err?: unknown) {
 function useStore(s: Store) {
   unsubStore?.();
   unsubSettings?.();
+  unsubOrder?.();
   store = s;
   unsubStore = s.subscribe((next) => {
     if (next.remote) {
@@ -429,6 +442,12 @@ function useStore(s: Store) {
       else s.saveSettings(settings);
     }
   });
+  unsubOrder = s.subscribeOrder(applyOrder); // 他の端末(デスクトップ通知など)での並べ替えもここに届く
+}
+
+function applyOrder(ids: string[]) {
+  order = ids;
+  if (!gate) fill();
 }
 
 function applySettings(save = true) {
@@ -534,6 +553,8 @@ shell.addEventListener("click", (e) => {
   const flt = tg.closest<HTMLElement>("[data-flt]");
   if (flt) { setFilter(normalizeFilter(flt.dataset.flt)); return; }
   if (tg.closest("[data-add-open]")) { openAdder(); return; }
+  if (tg.closest("[data-order-reset]")) { resetOrder(); return; }
+  if (tg.closest("[data-grip]")) return; // つかみハンドルのクリックは何もしない(ドラッグ/キーで操作)
   const ed = tg.closest<HTMLElement>("[data-edit]");
   if (ed) { openEditor(ed.dataset.edit!); return; }
   const body = tg.closest<HTMLElement>("[data-open]");
@@ -543,6 +564,180 @@ shell.addEventListener("click", (e) => {
     openEditor(body.dataset.open!);
   }
 });
+
+/* ================= 並べ替え(つかんでドラッグ / キーボード) ================= */
+const live = document.createElement("div");
+live.className = "vh";
+live.setAttribute("role", "status");
+live.setAttribute("aria-live", "polite");
+document.body.append(live);
+const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/** 見えている一覧の新しい順(id の配列)を、全体の並び順として保存する */
+function commitOrder(visibleIds: string[]) {
+  order = mergeVisibleOrder(state.tasks, order, visibleIds);
+  store.saveOrder(order);
+}
+
+function resetOrder() {
+  const prev = order;
+  order = [];
+  store.saveOrder([]);
+  fill();
+  toast("期限の近い順に戻しました", { label: "元に戻す", action: () => { order = prev; store.saveOrder(prev); fill(); }, ms: 5000 });
+}
+
+interface Drag {
+  id: string; li: HTMLElement; list: HTMLElement; grip: HTMLElement; pid: number;
+  sibs: HTMLElement[]; rects: { top: number; bottom: number }[];
+  from: number; to: number; h: number; gap: number; startPageY: number; listTop: number; clientY: number;
+  line: HTMLElement; raf: number; ending: boolean; onMove: (e: PointerEvent) => void; onUp: (e: PointerEvent) => void; onCancel: () => void;
+}
+let drag: Drag | null = null;
+
+/** 今の挿入位置に収まったときの、つかんだ項目の上端(ページ座標) */
+function slotTop(d: Drag): number {
+  const { rects, from, to, h } = d;
+  return to > from ? rects[to].bottom - h : to < from ? rects[to].top : rects[from].top;
+}
+
+function updateDrag() {
+  const d = drag;
+  if (!d || d.ending) return;
+  const { rects, from, h, gap } = d;
+  const top = Math.max(rects[0].top, Math.min(rects[rects.length - 1].bottom - h, rects[from].top + (d.clientY + window.scrollY - d.startPageY)));
+  d.li.style.transform = `translateY(${top - rects[from].top}px) scale(1.02)`;
+  const center = top + h / 2;
+  let to = 0;
+  rects.forEach((r, j) => { if (j !== from && (r.top + r.bottom) / 2 < center) to++; });
+  if (top >= rects[rects.length - 1].bottom - h - 0.5) to = rects.length - 1; // 端まで引いたら、端に入れる(高さが違っても届く)
+  else if (top <= rects[0].top + 0.5) to = 0;
+  d.to = to;
+  d.sibs.forEach((el, j) => {
+    if (j === from) return;
+    const dy = from < to && j > from && j <= to ? -(h + gap) : from > to && j >= to && j < from ? h + gap : 0;
+    el.style.transform = dy ? `translateY(${dy}px)` : "";
+  });
+  const slot = slotTop(d);
+  d.line.style.transform = `translateY(${(to === 0 ? slot : slot - gap / 2) - 1.5 - d.listTop}px)`;
+}
+
+function dragTick() {
+  const d = drag;
+  if (!d || d.ending) return;
+  const edge = 72, vh = window.innerHeight;
+  let v = 0;
+  if (d.clientY < edge) v = -Math.ceil(((edge - d.clientY) / edge) * 18);
+  else if (d.clientY > vh - edge) v = Math.ceil(((d.clientY - (vh - edge)) / edge) * 18);
+  if (v) { window.scrollBy(0, v); updateDrag(); } // 端に近づいたら自動スクロール
+  d.raf = requestAnimationFrame(dragTick);
+}
+
+function startDrag(grip: HTMLElement, e: PointerEvent) {
+  if (drag || gate || !e.isPrimary || (e.pointerType === "mouse" && e.button !== 0)) return;
+  const li = grip.closest<HTMLElement>(".item");
+  const list = li?.parentElement;
+  if (!li || !list) return;
+  e.preventDefault(); // 文字の選択やスクロールを始めさせない
+  const done = li.classList.contains("done");
+  const sibs = [...list.children].filter((c): c is HTMLElement => c.classList.contains("item") && c.classList.contains("done") === done);
+  const sy = window.scrollY;
+  const rects = sibs.map((el) => { const r = el.getBoundingClientRect(); return { top: r.top + sy, bottom: r.bottom + sy }; });
+  const from = sibs.indexOf(li);
+  const line = document.createElement("div");
+  line.className = "dropline";
+  line.setAttribute("aria-hidden", "true");
+  list.append(line);
+  const d: Drag = {
+    id: li.dataset.task!, li, list, grip, pid: e.pointerId, sibs, rects, from, to: from,
+    h: rects[from].bottom - rects[from].top, gap: sibs.length > 1 ? Math.max(0, rects[1].top - rects[0].bottom) : 0,
+    startPageY: e.clientY + sy, listTop: list.getBoundingClientRect().top + sy, clientY: e.clientY,
+    line, raf: 0, ending: false,
+    onMove: (ev) => { if (ev.pointerId !== d.pid) return; d.clientY = ev.clientY; updateDrag(); },
+    onUp: (ev) => { if (ev.pointerId === d.pid) endDrag(true); },
+    onCancel: () => endDrag(false),
+  };
+  drag = d;
+  list.classList.add("sorting");
+  li.classList.add("dragging");
+  grip.focus({ preventScroll: true });
+  try { grip.setPointerCapture(e.pointerId); } catch { /* 取れなくてもそのまま続ける */ }
+  grip.addEventListener("pointermove", d.onMove);
+  grip.addEventListener("pointerup", d.onUp);
+  grip.addEventListener("pointercancel", d.onCancel);
+  grip.addEventListener("lostpointercapture", d.onCancel);
+  updateDrag();
+  d.raf = requestAnimationFrame(dragTick);
+}
+
+/** 離す(commit=true なら新しい位置で確定)。落ち着くアニメーションのあとに一覧を作り直す */
+function endDrag(commit: boolean) {
+  const d = drag;
+  if (!d || d.ending) return;
+  d.ending = true;
+  cancelAnimationFrame(d.raf);
+  d.grip.removeEventListener("pointermove", d.onMove);
+  d.grip.removeEventListener("pointerup", d.onUp);
+  d.grip.removeEventListener("pointercancel", d.onCancel);
+  d.grip.removeEventListener("lostpointercapture", d.onCancel);
+  try { d.grip.releasePointerCapture(d.pid); } catch { /* すでに外れている */ }
+  const moved = commit && d.to !== d.from;
+  d.li.classList.add("settling");
+  d.li.style.transform = `translateY(${moved ? slotTop(d) - d.rects[d.from].top : 0}px) scale(1)`;
+  d.line.style.opacity = "0";
+  const finish = () => {
+    d.sibs.forEach((el) => { el.style.transform = ""; });
+    d.li.classList.remove("dragging", "settling");
+    d.li.style.transform = "";
+    d.list.classList.remove("sorting");
+    d.line.remove();
+    drag = null;
+    if (moved) {
+      commitOrder(moveTaskId(visibleList(), d.id, d.to));
+      fx.set(d.id, { kind: "drop", until: Date.now() + 700 });
+      scheduleFxCleanup();
+      const t = state.tasks.find((x) => x.id === d.id);
+      const same = visibleList().filter((x) => x.done === !!t?.done);
+      live.textContent = `${same.findIndex((x) => x.id === d.id) + 1}番目に移動しました(全${same.length}件)`;
+    }
+    fill(); // ドラッグ中に届いた変更もここで反映
+    if (moved) shell.querySelector<HTMLElement>(`[data-grip="${CSS.escape(d.id)}"]`)?.focus({ preventScroll: true });
+  };
+  if (reduceMotion()) finish(); else setTimeout(finish, 230);
+}
+
+shell.addEventListener("pointerdown", (e) => {
+  const grip = (e.target as HTMLElement).closest<HTMLElement>("[data-grip]");
+  if (grip) startDrag(grip, e);
+});
+document.addEventListener("keydown", (e) => { if (drag && e.key === "Escape") { e.preventDefault(); endDrag(false); } });
+
+/** キーボード: つかみハンドルにフォーカスして ↑↓ で1つずつ移動(Home/End で先頭/末尾) */
+shell.addEventListener("keydown", (e) => {
+  const grip = (e.target as HTMLElement).closest<HTMLElement>("[data-grip]");
+  if (!grip || drag || e.altKey || e.ctrlKey || e.metaKey) return;
+  const key = e.key;
+  if (key !== "ArrowUp" && key !== "ArrowDown" && key !== "Home" && key !== "End") return;
+  e.preventDefault();
+  const id = grip.dataset.grip!;
+  const vis = visibleList();
+  const cur = vis.find((t) => t.id === id);
+  if (!cur) return;
+  const group = vis.filter((t) => t.done === cur.done);
+  const i = group.findIndex((t) => t.id === id);
+  const to = key === "ArrowUp" ? i - 1 : key === "ArrowDown" ? i + 1 : key === "Home" ? 0 : group.length - 1;
+  if (to < 0 || to > group.length - 1 || to === i) {
+    live.textContent = key === "ArrowUp" || key === "Home" ? "いちばん上です" : "いちばん下です";
+    return;
+  }
+  commitOrder(moveTaskId(vis, id, to));
+  fx.set(id, { kind: "drop", until: Date.now() + 700 });
+  scheduleFxCleanup();
+  fill();
+  shell.querySelector<HTMLElement>(`[data-grip="${CSS.escape(id)}"]`)?.focus();
+  live.textContent = `${to + 1}番目に移動しました(全${group.length}件)`;
+});
+
 
 /* ================= 音声入力 ================= */
 function setMicState(kind: "add" | "note", on: boolean) {
@@ -801,8 +996,9 @@ async function login() {
 
 /** クラウドのストアを外し、データを画面から消す */
 function dropCloudStore() {
-  unsubStore?.(); unsubSettings?.();
-  unsubStore = null; unsubSettings = null;
+  unsubStore?.(); unsubSettings?.(); unsubOrder?.();
+  unsubStore = null; unsubSettings = null; unsubOrder = null;
+  order = [];
   if (store !== localStore) store.dispose();
   store = localStore;
   state = { ...EMPTY_STATE };

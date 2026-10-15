@@ -411,3 +411,40 @@ dialog.ask .sheet-body p { margin: 0; font-size: 14px }
 .addcta { display: inline-flex; align-items: center; justify-content: center; margin-top: 14px; height: 44px; padding: 0 22px; border: 0; border-radius: 999px; background: var(--grad); color: var(--on); font-weight: 700; cursor: pointer; box-shadow: 0 6px 16px -6px var(--a1) }
 .addcta:focus-visible { outline: 3px solid var(--a1); outline-offset: 2px }
 .adder .iconbtn.x { width: 44px; height: 44px }
+
+/* ===== 並べ替え(つかんでドラッグ) ===== */
+.list { position: relative }
+.item:has(.grip) { grid-template-columns: auto auto minmax(0, 1fr) auto }
+.grip { position: relative; width: 22px; height: 40px; margin: 0 -6px 0 -6px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: color-mix(in srgb, var(--muted) 52%, transparent);
+  display: grid; place-items: center; cursor: grab; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; transition: color .18s var(--ease), background .18s var(--ease) }
+.grip::after { content: ""; position: absolute; inset: -4px -5px } /* つかみやすく(44px 以上) */
+.item:hover .grip, .grip:focus-visible { color: var(--muted) }
+.grip:hover { color: var(--a1); background: var(--soft) }
+.grip:active { cursor: grabbing }
+.grip:focus-visible { outline: 3px solid var(--soft); outline-offset: 1px; color: var(--a1) }
+.ph .grip { margin-left: -8px }
+.lc .ph-body .grip { margin-left: -6px }
+
+.fbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 0 0 10px }
+.fbar .ftabs { margin: 0 }
+.resetorder { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 10px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .04em; cursor: pointer; margin-left: auto; transition: all .18s var(--ease) }
+.resetorder:hover { color: var(--a1); background: var(--soft) }
+.resetorder:focus-visible { outline: 3px solid var(--soft); outline-offset: 1px }
+
+.list.sorting .item:not(.dragging) { transition: transform .22s var(--ease), background .2s var(--ease) }
+.list.sorting .ibody { pointer-events: none }
+.list.sorting, .list.sorting .grip { cursor: grabbing }
+.item.dragging { z-index: 5; transition: none; cursor: grabbing; background: var(--surface) !important; border-color: color-mix(in srgb, var(--a1) 45%, var(--border)) !important;
+  box-shadow: 0 22px 44px -14px rgb(24 14 60 / .34), 0 6px 14px -4px rgb(24 14 60 / .18), 0 0 0 3px var(--soft) !important; will-change: transform }
+.dk .item.dragging { box-shadow: 0 22px 44px -12px rgb(0 0 0 / .65), 0 6px 14px -4px rgb(0 0 0 / .4), 0 0 0 3px var(--soft) !important }
+.item.dragging .grip { color: var(--a1) }
+.lc .item.dragging { border-radius: 14px; border-top-color: transparent !important }
+.item.dragging.settling { transition: transform .22s var(--ease) }
+.dropline { position: absolute; left: 0; right: 0; top: 0; height: 3px; border-radius: 3px; background: var(--grad); pointer-events: none; z-index: 6;
+  box-shadow: 0 0 0 3px var(--soft), 0 0 14px color-mix(in srgb, var(--a1) 55%, transparent); transition: transform .18s var(--ease) }
+.dropline::before, .dropline::after { content: ""; position: absolute; top: 50%; width: 9px; height: 9px; margin-top: -4.5px; border-radius: 50%; background: var(--a1); box-shadow: 0 0 0 3px var(--surface) }
+.dropline::before { left: -3px }
+.dropline::after { right: -3px }
+.item.landed { animation: landed .5s var(--ease) both }
+@keyframes landed { 0% { transform: scale(1.025); box-shadow: 0 16px 30px -12px rgb(24 14 60 / .3), 0 0 0 3px var(--soft) } 100% { transform: none } }
+.vh-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap }
