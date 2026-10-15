@@ -275,8 +275,7 @@ $xaml = @"
   <Window.ContextMenu>
     <ContextMenu>
       <MenuItem x:Name='mMini' Header='小さくする'/>
-      <MenuItem x:Name='mTop' Header='ミニ表示を常に最前面に' IsCheckable='True' IsChecked='True'/>
-      <Separator/>
+      <MenuItem x:Name='mTop' Header='ミニ表示を常に最前面に' IsCheckable='True' IsChecked='True' Visibility='Collapsed'/>
       <MenuItem x:Name='mCenter' Header='中央に戻す'/>
       <MenuItem x:Name='mSize' Header='元の大きさに戻す'/>
       <MenuItem x:Name='mOrder' Header='並び順を期限順に戻す' IsEnabled='False'/>
@@ -1085,7 +1084,6 @@ function On-Reply([string]$line) {
         if ($pl.w) { $script:userW = [double]$pl.w }
         if ($pl.h) { $script:userH = [double]$pl.h }
         if ($pl.expanded) { $script:expanded = $true }
-        $script:miniTop = [bool]$pl.miniTop; $w.FindName('mTop').IsChecked = $script:miniTop
         if ($null -ne $pl.mx) { $script:mx = [double]$pl.mx; $script:my = [double]$pl.my }
         if ($w.FindName('sv')) { Apply-Rows $false; Apply-Size }
         $w.UpdateLayout()
@@ -1191,8 +1189,12 @@ $w.Add_MouseLeftButtonDown({ param($s, $e)
     Save-State
   } })
 $w.FindName('mMini').Add_Click({ Toggle-Mini })
-$w.FindName('mTop').Add_Click({ $script:miniTop = [bool]$w.FindName('mTop').IsChecked; if ($script:mini) { $w.Topmost = $script:miniTop }; Save-State })
-if ($v.kind -ne 'list') { $w.FindName('mMini').Visibility = 'Collapsed'; $w.FindName('mTop').Visibility = 'Collapsed' }
+if ($v.kind -ne 'list') { $w.FindName('mMini').Visibility = 'Collapsed' }
+# ミニ表示(ペンギンの顔)は、ほかのどのウィンドウより上に出し続ける(最前面のウィンドウに隠されても、1秒ごとに上へ戻す)
+$script:topT = New-Object Windows.Threading.DispatcherTimer
+$script:topT.Interval = [TimeSpan]::FromMilliseconds(1000)
+$script:topT.Add_Tick({ if ($script:mini -and $script:placed -and -not $script:drag) { $w.Topmost = $false; $w.Topmost = $true } })
+$script:topT.Start()
 $w.FindName('x').Add_Click({ $w.Close() })
 $w.FindName('close').Add_Click({ $w.Close() })
 $w.FindName('mClose').Add_Click({ $w.Close() })
